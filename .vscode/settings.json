@@ -1,0 +1,21 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.python"
+    },
+    "[terraform]": {
+        "editor.defaultFormatter": "hashicorp.terraform",
+        "editor.formatOnSave": true
+    },
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black",
+    "python.defaultInterpreterPath": "${workspaceFolder}\\venv\\Scripts\\python.exe",
+    "files.eol": "\n",
+    "files.encoding": "utf8",
+    "terraform.languageServer.enable": true,
+    "terraform.languageServer.path": "",
+    "aws.telemetry": false,
+    "terminal.integrated.defaultProfile.windows": "PowerShell"
+}

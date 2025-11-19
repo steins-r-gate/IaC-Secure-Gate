@@ -1,0 +1,46 @@
+﻿# Terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+.Python
+venv/
+env/
+.venv
+.pytest_cache/
+.coverage
+*.egg-info/
+
+# AWS
+.aws/
+*.pem
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.BIN/
+
+# Secrets
+secrets/
+*.key
+*.secret
+.env
