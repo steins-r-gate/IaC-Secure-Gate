@@ -1,6 +1,6 @@
 ﻿terraform {
   required_version = ">= 1.5.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -20,15 +20,14 @@ provider "aws" {
 }
 
 locals {
-  project_name = "iam-security"
+  project_name = "IAM-Secure-Gate"
   environment  = "dev"
-  
+
   common_tags = {
     Project     = local.project_name
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
-    CreatedDate = timestamp()
   }
 }
 

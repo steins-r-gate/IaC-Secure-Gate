@@ -10,6 +10,12 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Ignore tfvars files, but keep example files
+*.tfvars
+!terraform.tfvars.example
+*.backup
+.DS_Store
+
 # Python
 __pycache__/
 *.py[cod]
