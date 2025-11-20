@@ -1,4 +1,9 @@
-﻿terraform {
+﻿# ==================================================================
+# Main Terraform configuration for the dev environment
+# ==================================================================
+
+# Specify the required Terraform version and providers
+terraform {
   required_version = ">= 1.5.0"
 
   required_providers {
@@ -11,6 +16,7 @@
   # Backend will be configured separately
 }
 
+# Configure the AWS provider
 provider "aws" {
   region = var.aws_region
 
@@ -19,6 +25,7 @@ provider "aws" {
   }
 }
 
+# Local variables
 locals {
   project_name = "IAM-Secure-Gate"
   environment  = "dev"

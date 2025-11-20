@@ -50,3 +50,7 @@ secrets/
 *.key
 *.secret
 .env
+
+# Logs
+*.log
+logs/

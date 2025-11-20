@@ -1,9 +1,15 @@
-﻿variable "aws_region" {
+﻿# ==================================================================
+# Terraform variables for the development environment
+# ==================================================================
+
+# AWS region
+variable "aws_region" {
   description = "AWS region for resources"
   type        = string
   default     = "eu-west-1"
 }
 
+# Owner email address
 variable "owner_email" {
   description = "Email address of the project owner"
   type        = string
@@ -14,6 +20,7 @@ variable "owner_email" {
   }
 }
 
+# Alert email address
 variable "alert_email" {
   description = "Email address for security alerts"
   type        = string

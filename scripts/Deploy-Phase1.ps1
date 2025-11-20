@@ -15,12 +15,14 @@ param(
 # Set error action preference
 $ErrorActionPreference = "Stop"
 
-# Get script directory
-$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptRoot
+# Get script & project directories
+$scriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path    # ...\IAM-Secure-Gate\scripts
+$projectRoot = Split-Path -Parent $scriptDir                      # ...\IAM-Secure-Gate
 
-# Setup logging
-$logDir = Join-Path $scriptRoot "logs"
+Set-Location $projectRoot
+
+# Setup logging (keep logs inside scripts/)
+$logDir = Join-Path $scriptDir "logs"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir "deploy-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
 
@@ -41,10 +43,9 @@ function Write-Log {
     }
 }
 
+# Cleanup function
 function Cleanup {
     param([string]$ErrorMessage)
-    
-    $currentPath = Get-Location
     
     if (Test-Path "tfplan") {
         Remove-Item "tfplan" -Force
@@ -52,10 +53,10 @@ function Cleanup {
     }
     
     if ($ErrorMessage) {
-        Write-Log "`n❌ $ErrorMessage" "Red"
+        Write-Log "`n $ErrorMessage" "Red"
     }
     
-    Set-Location $scriptRoot
+    Set-Location $projectRoot
 }
 
 # Banner
@@ -65,12 +66,13 @@ Write-Log " Environment: $Environment" "Cyan"
 Write-Log "=====================================" "Cyan"
 Write-Log ""
 
+# Dry run notice
 if ($DryRun) {
-    Write-Log "🔍 DRY RUN MODE - No changes will be applied" "Yellow"
+    Write-Log " DRY RUN MODE - No changes will be applied" "Yellow"
     Write-Log ""
 }
 
-# Verify project structure
+# Verify project structure (relative to project root)
 Write-Log "Verifying project structure..." "Yellow"
 $requiredPaths = @(
     "terraform\environments\$Environment",
@@ -84,7 +86,7 @@ foreach ($path in $requiredPaths) {
         exit 1
     }
 }
-Write-Log "✅ Project structure valid" "Green"
+Write-Log " Project structure valid" "Green"
 
 # Check prerequisites
 Write-Log "`nChecking prerequisites..." "Yellow"
@@ -96,7 +98,7 @@ if (-not $terraform) {
     exit 1
 }
 $tfVersion = (terraform version -json | ConvertFrom-Json).terraform_version
-Write-Log "✅ Terraform $tfVersion" "Green"
+Write-Log " Terraform $tfVersion" "Green"
 
 # Check AWS CLI
 $aws = Get-Command aws -ErrorAction SilentlyContinue
@@ -105,7 +107,7 @@ if (-not $aws) {
     exit 1
 }
 $awsVersion = aws --version
-Write-Log "✅ AWS CLI installed" "Green"
+Write-Log " AWS CLI installed" "Green"
 
 # Validate AWS credentials
 Write-Log "`nValidating AWS credentials..." "Yellow"
@@ -115,13 +117,13 @@ try {
         throw "AWS CLI returned error"
     }
     
-    Write-Log "✅ AWS Account: $($awsIdentity.Account)" "Green"
+    Write-Log " AWS Account: $($awsIdentity.Account)" "Green"
     Write-Log "   User/Role: $($awsIdentity.Arn)" "White"
     
     # Verify region
     $awsRegion = aws configure get region
     if ([string]::IsNullOrEmpty($awsRegion)) {
-        Write-Log "⚠️  No default region set, using eu-west-1" "Yellow"
+        Write-Log "  No default region set, using eu-west-1" "Yellow"
         $env:AWS_DEFAULT_REGION = "eu-west-1"
     } else {
         Write-Log "   Region: $awsRegion" "White"
@@ -133,7 +135,7 @@ try {
 }
 
 # Set AWS environment (if script exists)
-$awsEnvScript = Join-Path $scriptRoot "scripts\Set-AWSEnvironment.ps1"
+$awsEnvScript = Join-Path $projectRoot "scripts\Set-AWSEnvironment.ps1"
 if (Test-Path $awsEnvScript) {
     Write-Log "`nSetting AWS environment..." "Yellow"
     & $awsEnvScript
@@ -144,13 +146,13 @@ if (Test-Path $awsEnvScript) {
 }
 
 # Change to Terraform directory
-$tfDir = Join-Path $scriptRoot "terraform\environments\$Environment"
+$tfDir = Join-Path $projectRoot "terraform\environments\$Environment"
 Set-Location $tfDir
 Write-Log "`nWorking directory: $tfDir" "Cyan"
 
 # Check if backend is configured
 if (-not (Test-Path "backend.tf")) {
-    Write-Log "`n⚠️  Backend not configured" "Yellow"
+    Write-Log "`n  Backend not configured" "Yellow"
     Write-Log "Terraform state will be stored locally." "Yellow"
     Write-Log "For production, run: .\scripts\Setup-TerraformBackend.ps1" "Yellow"
     Write-Log ""
@@ -165,19 +167,19 @@ if (-not (Test-Path "backend.tf")) {
 }
 
 # Initialize Terraform
-Write-Log "`n📦 Initializing Terraform..." "Yellow"
+Write-Log "`n Initializing Terraform..." "Yellow"
 terraform init -upgrade
 if ($LASTEXITCODE -ne 0) {
     Cleanup "Terraform initialization failed"
     exit 1
 }
-Write-Log "✅ Terraform initialized" "Green"
+Write-Log " Terraform initialized" "Green"
 
 # Format check
-Write-Log "`n🎨 Checking code formatting..." "Yellow"
+Write-Log "`n Checking code formatting..." "Yellow"
 terraform fmt -check -recursive
 if ($LASTEXITCODE -ne 0) {
-    Write-Log "⚠️  Code formatting issues detected" "Yellow"
+    Write-Log " Code formatting issues detected" "Yellow"
     Write-Log "Run 'terraform fmt -recursive' to fix" "Yellow"
 }
 
@@ -188,18 +190,18 @@ if ($LASTEXITCODE -ne 0) {
     Cleanup "Terraform validation failed"
     exit 1
 }
-Write-Log "✅ Configuration valid" "Green"
+Write-Log " Configuration valid" "Green"
 
 # Handle terraform.tfvars
 if (-not (Test-Path "terraform.tfvars")) {
-    Write-Log "`n⚠️  terraform.tfvars not found" "Yellow"
+    Write-Log "`n  terraform.tfvars not found" "Yellow"
     
     if (Test-Path "terraform.tfvars.example") {
         Copy-Item "terraform.tfvars.example" "terraform.tfvars"
         Write-Log "Created terraform.tfvars from example" "Cyan"
         
         Write-Log ""
-        Write-Log "📝 Required variables in terraform.tfvars:" "Cyan"
+        Write-Log " Required variables in terraform.tfvars:" "Cyan"
         Write-Log "   - owner_email     (your email address)" "White"
         Write-Log "   - alert_email     (security alerts email)" "White"
         Write-Log ""
@@ -225,7 +227,7 @@ if (-not (Test-Path "terraform.tfvars")) {
             exit 1
         }
         
-        Write-Log "✅ terraform.tfvars configured" "Green"
+        Write-Log " terraform.tfvars configured" "Green"
     } else {
         Cleanup "terraform.tfvars.example not found"
         exit 1
@@ -233,16 +235,16 @@ if (-not (Test-Path "terraform.tfvars")) {
 }
 
 # Check for state locks
-Write-Log "`n🔒 Checking for state locks..." "Yellow"
+Write-Log "`n Checking for state locks..." "Yellow"
 try {
     $null = terraform force-unlock -help 2>&1
-    Write-Log "✅ No state locks detected" "Green"
+    Write-Log " No state locks detected" "Green"
 } catch {
-    Write-Log "⚠️  Could not check state locks" "Yellow"
+    Write-Log "  Could not check state locks" "Yellow"
 }
 
 # Create plan
-Write-Log "`n📋 Creating execution plan..." "Yellow"
+Write-Log "`n Creating execution plan..." "Yellow"
 Write-Log "This may take a few minutes..." "White"
 Write-Log ""
 
@@ -265,7 +267,7 @@ Write-Log ""
 
 # Exit if dry run
 if ($DryRun) {
-    Write-Log "🔍 DRY RUN COMPLETE - No changes applied" "Cyan"
+    Write-Log " DRY RUN COMPLETE - No changes applied" "Cyan"
     Write-Log "Review the plan above. Remove -DryRun to apply changes." "Yellow"
     Cleanup
     exit 0
@@ -293,7 +295,7 @@ if ($AutoApprove) {
 }
 
 if ($applyPlan) {
-    Write-Log "`n🚀 Applying infrastructure changes..." "Yellow"
+    Write-Log "`n Applying infrastructure changes..." "Yellow"
     Write-Log "This may take several minutes..." "White"
     Write-Log ""
     
@@ -305,18 +307,18 @@ if ($applyPlan) {
     if ($LASTEXITCODE -eq 0) {
         Write-Log ""
         Write-Log "=====================================" "Green"
-        Write-Log " ✅ DEPLOYMENT SUCCESSFUL!" "Green"
+        Write-Log "  DEPLOYMENT SUCCESSFUL!" "Green"
         Write-Log "=====================================" "Green"
         Write-Log "Duration: $([math]::Round($duration, 2)) seconds" "White"
         Write-Log ""
         
-        # Save outputs
-        $outputsFile = Join-Path $scriptRoot "outputs.json"
+        # Save outputs at project root
+        $outputsFile = Join-Path $projectRoot "outputs.json"
         terraform output -json | Out-File -FilePath $outputsFile -Encoding UTF8
-        Write-Log "📄 Outputs saved to: outputs.json" "Cyan"
+        Write-Log " Outputs saved to: outputs.json" "Cyan"
         
         # Show key outputs
-        Write-Log "`n📊 Key Resources Created:" "Cyan"
+        Write-Log "`n Key Resources Created:" "Cyan"
         try {
             $outputs = terraform output -json | ConvertFrom-Json
             if ($outputs.cloudtrail_bucket_name) {
@@ -335,24 +337,24 @@ if ($applyPlan) {
         # Cleanup plan file
         Remove-Item "tfplan" -Force -ErrorAction SilentlyContinue
         
-        # Return to root
-        Set-Location $scriptRoot
+        # Return to project root
+        Set-Location $projectRoot
         
         # Run verification
-        $verifyScript = Join-Path $scriptRoot "scripts\Verify-Phase1.ps1"
+        $verifyScript = Join-Path $projectRoot "scripts\Verify-Phase1.ps1"
         if (Test-Path $verifyScript) {
-            Write-Log "`n🔍 Running verification tests..." "Yellow"
+            Write-Log "`n Running verification tests..." "Yellow"
             & $verifyScript
             
             if ($LASTEXITCODE -eq 0) {
-                Write-Log "`n✅ All verification tests passed!" "Green"
+                Write-Log "`n All verification tests passed!" "Green"
             } else {
-                Write-Log "`n⚠️  Some verification tests failed" "Yellow"
+                Write-Log "`n Some verification tests failed" "Yellow"
                 Write-Log "Review the output above for details" "Yellow"
             }
         }
         
-        Write-Log "`n📝 Log file: $logFile" "Cyan"
+        Write-Log "`n Log file: $logFile" "Cyan"
         Write-Log ""
         
     } else {

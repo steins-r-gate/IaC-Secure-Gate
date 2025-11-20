@@ -8,7 +8,7 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "env": {
-        "AWS_PROFILE": "iam-security-project",
+        "AWS_PROFILE": "IAM-Secure-Gate",
         "AWS_REGION": "eu-west-1"
       }
     }

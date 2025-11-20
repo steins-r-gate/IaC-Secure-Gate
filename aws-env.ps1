@@ -1,5 +1,5 @@
 ﻿# Auto-generated AWS environment configuration
-# Generated: 2025-11-19 19:18:13
+# Generated: 2025-11-20 13:42:15
 
 $env:AWS_PROFILE = "IAM-Secure-Gate"
 $env:AWS_REGION = "eu-west-1"

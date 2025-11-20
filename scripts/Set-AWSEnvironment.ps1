@@ -127,16 +127,16 @@ try {
     # Verify region is set correctly
     $currentRegion = aws configure get region --profile $Profile
     if ($currentRegion -ne $Region) {
-        Write-ColorOutput "⚠️  Warning: Profile default region ($currentRegion) differs from specified region ($Region)" "Yellow"
+        Write-ColorOutput " Warning: Profile default region ($currentRegion) differs from specified region ($Region)" "Yellow"
         Write-ColorOutput "   Using: $Region" "Yellow"
         Write-Host ""
     }
     
     # Check for MFA (optional but good practice)
     if ($identity.Arn -match ":assumed-role/") {
-        Write-ColorOutput "ℹ️  Using assumed role (MFA likely enabled)" "Cyan"
+        Write-ColorOutput "ℹ Using assumed role (MFA likely enabled)" "Cyan"
     } elseif ($identity.Arn -match ":user/") {
-        Write-ColorOutput "ℹ️  Using IAM user. Consider using MFA for security." "Cyan"
+        Write-ColorOutput "ℹ Using IAM user. Consider using MFA for security." "Cyan"
     }
     
     Write-Host ""
@@ -148,7 +148,7 @@ try {
     
 } catch {
     Write-Host ""
-    Write-ColorOutput "❌ Failed to validate AWS credentials" "Red"
+    Write-ColorOutput "Failed to validate AWS credentials" "Red"
     Write-ColorOutput "Error: $($_.Exception.Message)" "Red"
     Write-Host ""
     Write-ColorOutput "Troubleshooting:" "Yellow"
@@ -179,13 +179,13 @@ foreach ($permission in $requiredPermissions.Keys) {
 }
 
 if ($permissionWarnings.Count -eq 0) {
-    Write-ColorOutput "✅ Basic checks passed" "Green"
+    Write-ColorOutput " Basic checks passed" "Green"
 } else {
-    Write-ColorOutput "⚠️  Note: Full permission validation requires deployment" "Yellow"
+    Write-ColorOutput " Note: Full permission validation requires deployment" "Yellow"
 }
 
 Write-Host ""
-Write-ColorOutput "Ready to deploy! 🚀" "Green"
+Write-ColorOutput "Ready to deploy!" "Green"
 Write-Host ""
 
 # Optionally export to file for other tools

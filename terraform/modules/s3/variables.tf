@@ -1,4 +1,6 @@
-﻿variable "environment" {
+﻿# s3/variables.tf
+
+variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string
 

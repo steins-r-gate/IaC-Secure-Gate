@@ -33,7 +33,7 @@ function Test-AWSResource {
     try {
         $result = Invoke-Expression $Command 2>&1
         if ($LASTEXITCODE -eq 0) {
-            Write-ColorOutput "✅ $ResourceType '$ResourceName' already exists" "Green"
+            Write-ColorOutput " $ResourceType '$ResourceName' already exists" "Green"
             return $true
         }
         return $false
@@ -52,16 +52,16 @@ Write-Host ""
 Write-ColorOutput "Checking prerequisites..." "Yellow"
 
 if (-not (Get-Command aws -ErrorAction SilentlyContinue)) {
-    Write-ColorOutput "❌ AWS CLI not installed" "Red"
+    Write-ColorOutput " AWS CLI not installed" "Red"
     exit 1
 }
 
 if (-not (Get-Command terraform -ErrorAction SilentlyContinue)) {
-    Write-ColorOutput "❌ Terraform not installed" "Red"
+    Write-ColorOutput " Terraform not installed" "Red"
     exit 1
 }
 
-Write-ColorOutput "✅ Prerequisites OK" "Green"
+Write-ColorOutput " Prerequisites OK" "Green"
 Write-Host ""
 
 # Set AWS environment
@@ -77,11 +77,11 @@ try {
     }
     
     $identity = aws sts get-caller-identity --output json | ConvertFrom-Json
-    Write-ColorOutput "✅ AWS Account: $accountId" "Green"
+    Write-ColorOutput " AWS Account: $accountId" "Green"
     Write-ColorOutput "   User/Role: $($identity.Arn.Split('/')[-1])" "White"
     Write-Host ""
 } catch {
-    Write-ColorOutput "❌ Failed to validate AWS credentials" "Red"
+    Write-ColorOutput " Failed to validate AWS credentials" "Red"
     Write-ColorOutput "   Run: aws configure --profile $Profile" "Yellow"
     exit 1
 }
@@ -111,7 +111,7 @@ $tableExists = Test-AWSResource `
 
 if ($bucketExists -and $tableExists -and -not $Force) {
     Write-Host ""
-    Write-ColorOutput "✅ Backend infrastructure already exists" "Green"
+    Write-ColorOutput " Backend infrastructure already exists" "Green"
     Write-ColorOutput "   Use -Force to reconfigure" "Yellow"
     
     # Still create backend.tf if it doesn't exist
@@ -130,7 +130,7 @@ if ($bucketExists -and $tableExists -and -not $Force) {
 
 Write-Host ""
 if (-not $Force) {
-    Write-ColorOutput "⚠️  This will create AWS resources (estimated cost: <$1/month)" "Yellow"
+    Write-ColorOutput " This will create AWS resources (estimated cost: <$1/month)" "Yellow"
     $confirm = Read-Host "Continue? (yes/no)"
     if ($confirm -ne "yes") {
         Write-ColorOutput "Setup cancelled" "Yellow"
@@ -201,9 +201,9 @@ if (-not (Test-AWSResource -Command "aws s3api head-bucket --bucket $logsBucketN
             {Key=Purpose,Value=AccessLogs}
         ]"
         
-        Write-ColorOutput "✅ Logs bucket created and secured" "Green"
+        Write-ColorOutput " Logs bucket created and secured" "Green"
     } catch {
-        Write-ColorOutput "❌ Failed to create logs bucket: $($_.Exception.Message)" "Red"
+        Write-ColorOutput " Failed to create logs bucket: $($_.Exception.Message)" "Red"
         exit 1
     }
 }
@@ -319,10 +319,10 @@ if (-not $bucketExists) {
         ]"
         Write-ColorOutput "  ✓ Tags applied" "White"
         
-        Write-ColorOutput "✅ State bucket created and secured" "Green"
+        Write-ColorOutput " State bucket created and secured" "Green"
         
     } catch {
-        Write-ColorOutput "❌ Failed to create state bucket: $($_.Exception.Message)" "Red"
+        Write-ColorOutput " Failed to create state bucket: $($_.Exception.Message)" "Red"
         
         # Cleanup on failure
         Write-ColorOutput "Cleaning up..." "Yellow"
@@ -378,10 +378,10 @@ if (-not $tableExists) {
             --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
         Write-ColorOutput "  ✓ Point-in-time recovery enabled" "White"
         
-        Write-ColorOutput "✅ DynamoDB table created and configured" "Green"
+        Write-ColorOutput " DynamoDB table created and configured" "Green"
         
     } catch {
-        Write-ColorOutput "❌ Failed to create DynamoDB table: $($_.Exception.Message)" "Red"
+        Write-ColorOutput " Failed to create DynamoDB table: $($_.Exception.Message)" "Red"
         
         # Cleanup on failure
         Write-ColorOutput "Cleaning up..." "Yellow"
@@ -401,7 +401,7 @@ $backendDir = "terraform\environments\$Environment"
 $backendFile = Join-Path $backendDir "backend.tf"
 
 if (-not (Test-Path $backendDir)) {
-    Write-ColorOutput "⚠️  Directory not found: $backendDir" "Yellow"
+    Write-ColorOutput "  Directory not found: $backendDir" "Yellow"
     New-Item -ItemType Directory -Path $backendDir -Force | Out-Null
     Write-ColorOutput "  Created directory" "White"
 }
@@ -427,7 +427,7 @@ terraform {
 
 $backendConfig | Out-File -FilePath $backendFile -Encoding UTF8
 
-Write-ColorOutput "✅ Backend configuration created" "Green"
+Write-ColorOutput " Backend configuration created" "Green"
 Write-ColorOutput "   Location: $backendFile" "White"
 
 # Create backend config summary
@@ -475,7 +475,7 @@ $summary | Out-File -FilePath $summaryFile -Encoding UTF8
 
 Write-Host ""
 Write-ColorOutput "=====================================" "Green"
-Write-ColorOutput " ✅ BACKEND SETUP COMPLETE!" "Green"
+Write-ColorOutput "  BACKEND SETUP COMPLETE!" "Green"
 Write-ColorOutput "=====================================" "Green"
 Write-Host ""
 
@@ -500,7 +500,7 @@ $verificationPassed = $true
 # Check bucket
 $bucketCheck = aws s3api head-bucket --bucket $bucketName 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-ColorOutput "❌ State bucket verification failed" "Red"
+    Write-ColorOutput " State bucket verification failed" "Red"
     $verificationPassed = $false
 } else {
     Write-ColorOutput "✅ State bucket accessible" "Green"
@@ -509,27 +509,27 @@ if ($LASTEXITCODE -ne 0) {
 # Check table
 $tableCheck = aws dynamodb describe-table --table-name $tableName 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-ColorOutput "❌ DynamoDB table verification failed" "Red"
+    Write-ColorOutput " DynamoDB table verification failed" "Red"
     $verificationPassed = $false
 } else {
-    Write-ColorOutput "✅ DynamoDB table accessible" "Green"
+    Write-ColorOutput " DynamoDB table accessible" "Green"
 }
 
 # Check backend.tf
 if (Test-Path $backendFile) {
-    Write-ColorOutput "✅ Backend configuration file exists" "Green"
+    Write-ColorOutput " Backend configuration file exists" "Green"
 } else {
-    Write-ColorOutput "❌ Backend configuration file not found" "Red"
+    Write-ColorOutput " Backend configuration file not found" "Red"
     $verificationPassed = $false
 }
 
 Write-Host ""
 
 if ($verificationPassed) {
-    Write-ColorOutput "🎉 All verification checks passed!" "Green"
+    Write-ColorOutput " All verification checks passed!" "Green"
     exit 0
 } else {
-    Write-ColorOutput "⚠️  Some verification checks failed" "Yellow"
+    Write-ColorOutput "  Some verification checks failed" "Yellow"
     Write-ColorOutput "   Review the output above" "White"
     exit 1
 }
