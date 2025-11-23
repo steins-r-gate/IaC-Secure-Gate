@@ -1,4 +1,4 @@
-﻿# ==================================================================
+# ==================================================================
 # Main Terraform configuration for the dev environment
 # terraform/environments/dev/main.tf
 # ==================================================================
@@ -28,6 +28,10 @@ provider "aws" {
   }
 }
 
+# Data sources to get current AWS account info
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 # Local variables
 locals {
   project_name = "IAM-Secure-Gate"
@@ -38,13 +42,8 @@ locals {
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
-    CreatedDate = timestamp()
   }
 }
-
-# Data sources to get current AWS account info
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
 
 # S3 Module
 module "s3" {

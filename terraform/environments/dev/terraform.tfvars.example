@@ -1,3 +1,0 @@
-﻿aws_region  = "eu-west-1"
-owner_email = "your-email@example.com"
-alert_email = "security-alerts@example.com"
