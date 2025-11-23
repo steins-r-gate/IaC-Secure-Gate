@@ -1,8 +1,8 @@
 ﻿# ==================================================================
 # Main Terraform configuration for the dev environment
+# terraform/environments/dev/main.tf
 # ==================================================================
 
-# Specify the required Terraform version and providers
 terraform {
   required_version = ">= 1.5.0"
 
@@ -13,7 +13,10 @@ terraform {
     }
   }
 
-  # Backend will be configured separately
+  # Local backend (state stored in current directory)
+  backend "local" {
+    path = "terraform.tfstate"
+  }
 }
 
 # Configure the AWS provider
@@ -35,13 +38,20 @@ locals {
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
+    CreatedDate = timestamp()
   }
 }
 
-# S3 Buckets
+# Data sources to get current AWS account info
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# S3 Module
 module "s3" {
   source = "../../modules/s3"
 
   environment = local.environment
   common_tags = local.common_tags
+  account_id  = data.aws_caller_identity.current.account_id
+  region      = data.aws_region.current.name
 }
