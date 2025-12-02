@@ -85,7 +85,7 @@ Build and validate a multi-layered IAM misconfiguration detection system using A
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     AWS Account (Single Region: us-east-1)           │
+│                     AWS Account (Single Region: eu-west-1)           │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                       │
 │  ┌──────────────────────────────────────────────────────────┐       │
@@ -401,13 +401,17 @@ locals {
 
 **Question:** Single region or multi-region deployment?
 
-**Decision:** ✅ **Single Region: `us-east-1`**  
+**Decision:** ✅ **Single Region: `eu-west-1` (Ireland)**  
 **Rationale:**
 
 - IAM is a global service (changes in any region are logged)
 - CloudTrail can be configured as multi-region trail (logs from all regions)
 - Cost optimization for student project
+- eu-west-1 chosen as user's home region (Dublin, Ireland - low latency)
 - Future phases can add regional aggregation
+
+**Important IAM Console Note:**  
+While we deploy detection infrastructure in eu-west-1, the AWS IAM console always defaults to showing "Global" or "us-east-1" in the region selector. This is normal behavior - IAM is a global service and your CloudTrail multi-region trail in eu-west-1 will capture all IAM API calls regardless of where they appear to originate in the console.
 
 **Trade-off Accepted:** Regional AWS services (e.g., S3, Lambda in other regions) won't be monitored by Config rules, but IAM is global so no gap in IAM detection.
 
@@ -649,11 +653,11 @@ aws accessanalyzer list-findings --analyzer-arn <analyzer-arn>
 resource "aws_securityhub_account" "main"
 
 resource "aws_securityhub_standards_subscription" "foundational" {
-  standards_arn = "arn:aws:securityhub:us-east-1::standards/aws-foundational-security-best-practices/v/1.0.0"
+  standards_arn = "arn:aws:securityhub:eu-west-1::standards/aws-foundational-security-best-practices/v/1.0.0"
 }
 
 resource "aws_securityhub_standards_subscription" "cis" {
-  standards_arn = "arn:aws:securityhub:us-east-1::standards/cis-aws-foundations-benchmark/v/1.2.0"
+  standards_arn = "arn:aws:securityhub:eu-west-1::standards/cis-aws-foundations-benchmark/v/1.2.0"
 }
 ```
 
@@ -845,6 +849,36 @@ terraform apply -auto-approve
 
 ## Testing Strategy
 
+### Prerequisites for Testing
+
+Before executing test scenarios, ensure your AWS CLI is configured for the correct region:
+
+**Option 1: Set Default Region (Recommended)**
+
+```bash
+# Configure AWS CLI to default to eu-west-1
+aws configure set region eu-west-1
+
+# Verify configuration
+aws configure get region
+# Should output: eu-west-1
+```
+
+**Option 2: Use --region Flag**
+
+```bash
+# Add --region eu-west-1 to every AWS CLI command
+aws iam create-user --user-name test-user --region eu-west-1
+```
+
+**Important Notes:**
+
+- IAM commands work globally regardless of region setting, but other services (Config, Security Hub, Access Analyzer) are regional
+- All test commands below assume your default region is set to `eu-west-1`
+- If using PowerShell scripts, they should automatically use eu-west-1 via AWS credential configuration
+
+---
+
 ### Test Scenarios (5 Required for AC1)
 
 #### **Scenario 1: Root Account Access Key Creation**
@@ -986,7 +1020,7 @@ aws iam create-role \
 
 # 3. Verify Access Analyzer Finding:
 aws accessanalyzer list-findings \
-  --analyzer-arn arn:aws:access-analyzer:us-east-1:YOUR_ACCOUNT_ID:analyzer/iam-secure-gate-analyzer \
+  --analyzer-arn arn:aws:access-analyzer:eu-west-1:YOUR_ACCOUNT_ID:analyzer/iam-secure-gate-analyzer \
   --filter '{"resource": {"contains": ["test-external-trust-role"]}}'
 
 # 4. Verify Security Hub Ingestion:
@@ -1274,7 +1308,7 @@ Given the scope of Phase 1, **$5/month is not realistic** if you want:
 - Enable Security Hub integrations explicitly in Terraform:
   ```hcl
   resource "aws_securityhub_product_subscription" "config" {
-    product_arn = "arn:aws:securityhub:us-east-1::product/aws/config"
+    product_arn = "arn:aws:securityhub:eu-west-1::product/aws/config"
   }
   ```
 - Test finding ingestion during module development, not just at the end
@@ -1395,7 +1429,7 @@ Given the scope of Phase 1, **$5/month is not realistic** if you want:
 1. **Finalize Critical Decisions:**
 
    - Confirm budget tolerance ($12-15/month vs. $5/month)
-   - Choose AWS region (`us-east-1` recommended)
+   - AWS region: `eu-west-1` (Ireland - your home region)
    - Approve 3-rule Config setup (vs. 5-rule original plan)
 
 2. **Build Foundation Module:**
@@ -1495,7 +1529,7 @@ Given the scope of Phase 1, **$5/month is not realistic** if you want:
    - Should we replace with different test scenario, or accept as "manual validation only"?
 
 5. **Multi-Region Consideration:**
-   - Phase 1 is single-region (us-east-1)
+   - Phase 1 is single-region (eu-west-1 Ireland)
    - Should Phase 4/5 add multi-region support, or is single-region acceptable for FYP?
 
 ---
@@ -1512,7 +1546,5 @@ Given the scope of Phase 1, **$5/month is not realistic** if you want:
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** December 2024  
+**Last Updated:** December 2025  
 **Status:** Planning Complete → Ready for Implementation
-
-**Next Review:** End of Week 1 (after foundation module completion)
