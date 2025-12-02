@@ -1,204 +1,78 @@
-﻿# Set-AWSEnvironment.ps1
-# Sets up AWS environment variables for IAM-Secure-Gate project
+﻿# scripts/Set-AWSEnvironment.ps1
+# Simplified AWS environment setup for demo
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$Profile = "IAM-Secure-Gate",
+    [string]$Profile = "default",
     
     [Parameter(Mandatory=$false)]
-    [string]$Region = "eu-west-1",
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$CreateProfile
+    [string]$Region = "eu-west-1"
 )
 
 $ErrorActionPreference = "Stop"
 
-function Write-ColorOutput {
-    param(
-        [string]$Message,
-        [string]$Color = "White"
-    )
+function Write-Color {
+    param([string]$Message, [string]$Color = "White")
     Write-Host $Message -ForegroundColor $Color
 }
 
-Write-ColorOutput "=====================================" "Cyan"
-Write-ColorOutput " AWS Environment Configuration" "Cyan"
-Write-ColorOutput "=====================================" "Cyan"
-Write-Host ""
+Write-Color "`n========================================" "Cyan"
+Write-Color "  AWS Environment Setup" "Cyan"
+Write-Color "========================================" "Cyan"
 
-# Check if AWS CLI is installed
-Write-ColorOutput "Checking AWS CLI..." "Yellow"
-$awsCli = Get-Command aws -ErrorAction SilentlyContinue
-if (-not $awsCli) {
-    Write-ColorOutput "❌ AWS CLI not installed" "Red"
-    Write-ColorOutput "" "White"
-    Write-ColorOutput "Install AWS CLI:" "Yellow"
-    Write-ColorOutput "  Windows: https://awscli.amazonaws.com/AWSCLIV2.msi" "White"
-    Write-ColorOutput "  Or run: winget install Amazon.AWSCLI" "White"
+# Check AWS CLI
+Write-Color "`nChecking AWS CLI..." "Yellow"
+try {
+    $awsVersion = aws --version 2>&1
+    Write-Color "✅ AWS CLI installed: $($awsVersion.Split()[0])" "Green"
+} catch {
+    Write-Color "❌ AWS CLI not installed" "Red"
+    Write-Color "`nInstall with: winget install Amazon.AWSCLI" "Yellow"
     exit 1
 }
 
-$awsVersion = (aws --version 2>&1)
-Write-ColorOutput "✅ AWS CLI installed: $awsVersion" "Green"
-Write-Host ""
-
-# Check if profile exists
-Write-ColorOutput "Checking AWS profile '$Profile'..." "Yellow"
-$profiles = aws configure list-profiles 2>$null
-$profileExists = $profiles -contains $Profile
-
-if (-not $profileExists) {
-    Write-ColorOutput "⚠️  Profile '$Profile' not found" "Yellow"
-    Write-Host ""
-    
-    if ($CreateProfile) {
-        Write-ColorOutput "Creating profile '$Profile'..." "Yellow"
-        Write-Host ""
-        Write-ColorOutput "You'll need:" "Cyan"
-        Write-ColorOutput "  1. AWS Access Key ID" "White"
-        Write-ColorOutput "  2. AWS Secret Access Key" "White"
-        Write-ColorOutput "  3. Default region (press Enter for eu-west-1)" "White"
-        Write-Host ""
-        
-        aws configure --profile $Profile
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-ColorOutput "❌ Failed to create profile" "Red"
-            exit 1
-        }
-        
-        Write-ColorOutput "✅ Profile created successfully" "Green"
-        Write-Host ""
-    } else {
-        Write-ColorOutput "Available profiles:" "Cyan"
-        if ($profiles) {
-            $profiles | ForEach-Object { Write-ColorOutput "  - $_" "White" }
-        } else {
-            Write-ColorOutput "  (none configured)" "White"
-        }
-        Write-Host ""
-        Write-ColorOutput "Options:" "Yellow"
-        Write-ColorOutput "  1. Run: aws configure --profile $Profile" "White"
-        Write-ColorOutput "  2. Run this script with -CreateProfile flag" "White"
-        Write-ColorOutput "  3. Use existing profile with -Profile parameter" "White"
-        exit 1
-    }
-}
-
-Write-ColorOutput "✅ Profile '$Profile' exists" "Green"
-
-# Set environment variables
-Write-ColorOutput "`nSetting environment variables..." "Yellow"
-$env:AWS_PROFILE = $Profile
-$env:AWS_REGION = $Region
-$env:AWS_DEFAULT_REGION = $Region
-
-# Validate credentials by getting account ID
-Write-ColorOutput "Validating credentials..." "Yellow"
+# Check credentials
+Write-Color "`nValidating AWS credentials..." "Yellow"
 try {
-    $accountId = aws sts get-caller-identity --query Account --output text --profile $Profile 2>&1
+    $identity = aws sts get-caller-identity --profile $Profile --output json 2>&1 | ConvertFrom-Json
     
-    if ($LASTEXITCODE -ne 0) {
-        throw "AWS CLI returned error: $accountId"
+    if (-not $identity.Account) {
+        throw "No valid credentials"
     }
     
-    if ([string]::IsNullOrEmpty($accountId)) {
-        throw "Failed to retrieve account ID"
-    }
+    $accountId = $identity.Account
+    $userArn = $identity.Arn
     
+    Write-Color "✅ Credentials valid" "Green"
+    Write-Color "`nAWS Account Information:" "Cyan"
+    Write-Color "  Account ID: $accountId" "White"
+    Write-Color "  Region:     $Region" "White"
+    Write-Color "  User/Role:  $($userArn.Split('/')[-1])" "White"
+    Write-Color "  ARN:        $userArn" "Gray"
+    
+    # Set environment variables
+    $env:AWS_PROFILE = $Profile
+    $env:AWS_REGION = $Region
+    $env:AWS_DEFAULT_REGION = $Region
     $env:AWS_ACCOUNT_ID = $accountId
     
-    # Get full identity for verification
-    $identity = aws sts get-caller-identity --output json --profile $Profile | ConvertFrom-Json
-    
-    Write-Host ""
-    Write-ColorOutput "=====================================" "Green"
-    Write-ColorOutput " ✅ AWS Environment Configured" "Green"
-    Write-ColorOutput "=====================================" "Green"
-    Write-ColorOutput "Profile:       $Profile" "Cyan"
-    Write-ColorOutput "Region:        $Region" "Cyan"
-    Write-ColorOutput "Account ID:    $accountId" "Cyan"
-    Write-ColorOutput "User/Role:     $($identity.Arn.Split('/')[-1])" "Cyan"
-    Write-ColorOutput "ARN:           $($identity.Arn)" "White"
-    Write-ColorOutput "=====================================" "Green"
-    Write-Host ""
-    
-    # Verify region is set correctly
-    $currentRegion = aws configure get region --profile $Profile
-    if ($currentRegion -ne $Region) {
-        Write-ColorOutput " Warning: Profile default region ($currentRegion) differs from specified region ($Region)" "Yellow"
-        Write-ColorOutput "   Using: $Region" "Yellow"
-        Write-Host ""
-    }
-    
-    # Check for MFA (optional but good practice)
-    if ($identity.Arn -match ":assumed-role/") {
-        Write-ColorOutput "ℹ Using assumed role (MFA likely enabled)" "Cyan"
-    } elseif ($identity.Arn -match ":user/") {
-        Write-ColorOutput "ℹ Using IAM user. Consider using MFA for security." "Cyan"
-    }
-    
-    Write-Host ""
-    Write-ColorOutput "Environment variables set:" "White"
-    Write-ColorOutput "  AWS_PROFILE=$env:AWS_PROFILE" "White"
-    Write-ColorOutput "  AWS_REGION=$env:AWS_REGION" "White"
-    Write-ColorOutput "  AWS_ACCOUNT_ID=$env:AWS_ACCOUNT_ID" "White"
-    Write-Host ""
+    Write-Color "`n✅ Environment configured successfully!" "Green"
+    Write-Color "`nEnvironment Variables Set:" "Cyan"
+    Write-Color "  AWS_PROFILE = $Profile" "White"
+    Write-Color "  AWS_REGION = $Region" "White"
+    Write-Color "  AWS_ACCOUNT_ID = $accountId" "White"
     
 } catch {
-    Write-Host ""
-    Write-ColorOutput "Failed to validate AWS credentials" "Red"
-    Write-ColorOutput "Error: $($_.Exception.Message)" "Red"
-    Write-Host ""
-    Write-ColorOutput "Troubleshooting:" "Yellow"
-    Write-ColorOutput "  1. Check credentials: aws configure list --profile $Profile" "White"
-    Write-ColorOutput "  2. Test access: aws sts get-caller-identity --profile $Profile" "White"
-    Write-ColorOutput "  3. Verify IAM permissions for sts:GetCallerIdentity" "White"
-    Write-Host ""
+    Write-Color "❌ AWS credentials not configured or invalid" "Red"
+    Write-Color "`nError: $_" "Red"
+    Write-Color "`nSetup Options:" "Yellow"
+    Write-Color "  1. Configure default profile: aws configure" "White"
+    Write-Color "  2. Use named profile: aws configure --profile IAM-Secure-Gate" "White"
+    Write-Color "  3. Then run: .\Set-AWSEnvironment.ps1 -Profile IAM-Secure-Gate" "White"
     exit 1
 }
 
-# Optional: Check for required IAM permissions
-Write-ColorOutput "Checking IAM permissions..." "Yellow"
-$requiredPermissions = @{
-    "s3:CreateBucket" = "S3 bucket creation"
-    "iam:CreateRole" = "IAM role creation"
-    "kms:CreateKey" = "KMS key creation"
-    "cloudtrail:CreateTrail" = "CloudTrail setup"
-    "config:PutConfigurationRecorder" = "AWS Config setup"
-}
-
-$permissionWarnings = @()
-foreach ($permission in $requiredPermissions.Keys) {
-    $service = $permission.Split(':')[0]
-    $action = $permission.Split(':')[1]
-    
-    # This is a simple check - in production you'd use IAM Policy Simulator
-    # aws iam simulate-principal-policy is more accurate but requires permissions
-}
-
-if ($permissionWarnings.Count -eq 0) {
-    Write-ColorOutput " Basic checks passed" "Green"
-} else {
-    Write-ColorOutput " Note: Full permission validation requires deployment" "Yellow"
-}
-
-Write-Host ""
-Write-ColorOutput "Ready to deploy!" "Green"
-Write-Host ""
-
-# Optionally export to file for other tools
-$exportFile = Join-Path $PSScriptRoot "..\aws-env.ps1"
-@"
-# Auto-generated AWS environment configuration
-# Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-
-`$env:AWS_PROFILE = "$Profile"
-`$env:AWS_REGION = "$Region"
-`$env:AWS_ACCOUNT_ID = "$accountId"
-"@ | Out-File -FilePath $exportFile -Encoding UTF8
-
-Write-ColorOutput "Configuration saved to: aws-env.ps1" "Cyan"
-Write-ColorOutput "  (Source this file in other sessions)" "White"
-Write-Host ""
+Write-Color "`n========================================" "Cyan"
+Write-Color "Ready to deploy!" "Green"
+Write-Color "Run: .\Deploy-Demo.ps1" "Cyan"
+Write-Color "========================================`n" "Cyan"

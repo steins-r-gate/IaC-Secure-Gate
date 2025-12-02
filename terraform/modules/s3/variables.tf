@@ -1,4 +1,6 @@
-﻿# s3/variables.tf
+﻿# ==================================================================
+# terraform/modules/s3/variables.tf
+# ==================================================================
 
 variable "environment" {
   description = "Environment name (dev, staging, prod)"
@@ -16,49 +18,30 @@ variable "common_tags" {
   default     = {}
 }
 
-# ============================================================================
-# Optional Lifecycle Configuration
-# ============================================================================
-variable "cloudtrail_log_retention_days" {
-  description = "Number of days to retain CloudTrail logs before deletion"
-  type        = number
-  default     = 365
+variable "account_id" {
+  description = "AWS Account ID"
+  type        = string
 }
 
-variable "config_log_retention_days" {
-  description = "Number of days to retain Config logs before deletion"
-  type        = number
-  default     = 365
-}
-
-variable "access_log_retention_days" {
-  description = "Number of days to retain S3 access logs before deletion"
-  type        = number
-  default     = 365
-}
-
-variable "transition_to_ia_days" {
-  description = "Number of days before transitioning to STANDARD_IA storage class"
-  type        = number
-  default     = 90
-}
-
-variable "transition_to_glacier_days" {
-  description = "Number of days before transitioning to GLACIER storage class"
-  type        = number
-  default     = 180
+variable "region" {
+  description = "AWS Region"
+  type        = string
 }
 
 # ============================================================================
-# KMS Configuration
+# Optional Configuration (for future expansion)
 # ============================================================================
-variable "kms_deletion_window_days" {
-  description = "Number of days before KMS key is deleted after destruction"
-  type        = number
-  default     = 10
 
-  validation {
-    condition     = var.kms_deletion_window_days >= 7 && var.kms_deletion_window_days <= 30
-    error_message = "KMS deletion window must be between 7 and 30 days."
-  }
-}
+# Uncomment when expanding beyond demo:
+
+# variable "cloudtrail_log_retention_days" {
+#   description = "Number of days to retain CloudTrail logs"
+#   type        = number
+#   default     = 365
+# }
+# 
+# variable "enable_kms_encryption" {
+#   description = "Use KMS encryption instead of AES256"
+#   type        = bool
+#   default     = false
+# }
