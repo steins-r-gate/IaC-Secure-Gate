@@ -1,5 +1,5 @@
-# ==================================================================
-# Main Terraform configuration for the dev environment
+﻿# ==================================================================
+# Phase 1 - Development Environment
 # terraform/environments/dev/main.tf
 # ==================================================================
 
@@ -13,13 +13,12 @@ terraform {
     }
   }
 
-  # Local backend (state stored in current directory)
   backend "local" {
     path = "terraform.tfstate"
   }
 }
 
-# Configure the AWS provider
+# Configure AWS Provider for eu-west-1
 provider "aws" {
   region = var.aws_region
 
@@ -28,29 +27,46 @@ provider "aws" {
   }
 }
 
-# Data sources to get current AWS account info
+# ==================================================================
+# Data Sources
+# ==================================================================
+
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# Local variables
+# ==================================================================
+# Local Variables
+# ==================================================================
+
 locals {
-  project_name = "IAM-Secure-Gate"
   environment  = "dev"
+  project_name = "iam-secure-gate"
 
   common_tags = {
-    Project     = local.project_name
+    Project     = "IAM-Secure-Gate"
+    Phase       = "Phase-1-Detection"
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
+    Region      = var.aws_region
   }
 }
 
-# S3 Module
-module "s3" {
-  source = "../../modules/s3"
+# ==================================================================
+# Phase 1 Modules
+# ==================================================================
 
-  environment = local.environment
-  common_tags = local.common_tags
-  account_id  = data.aws_caller_identity.current.account_id
-  region      = data.aws_region.current.name
+# Foundation Module (KMS + S3 Buckets)
+module "foundation" {
+  source = "../../modules/foundation"
+
+  environment  = local.environment
+  project_name = local.project_name
+  account_id   = data.aws_caller_identity.current.account_id
+  region       = data.aws_region.current.name
+  common_tags  = local.common_tags
+
+  # Retention settings (can override defaults)
+  cloudtrail_log_retention_days  = 90  # CIS requirement
+  config_snapshot_retention_days = 365 # Annual compliance
 }

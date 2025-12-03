@@ -54,3 +54,6 @@ secrets/
 # Logs
 *.log
 logs/
+# Backup directories (from scripts)
+backup-*/
+**/backup-*/

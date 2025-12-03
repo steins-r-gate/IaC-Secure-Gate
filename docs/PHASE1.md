@@ -1,1193 +1,1550 @@
-# Phase 1: AWS Detection Baseline - IAM-Secure-Gate
+# Phase 1: AWS Detection Baseline
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Components](#components)
-- [Cost Analysis](#cost-analysis)
-- [Security Features](#security-features)
-- [Prerequisites](#prerequisites)
-- [Deployment Guide](#deployment-guide)
-- [Verification](#verification)
-- [Troubleshooting](#troubleshooting)
-- [Next Steps](#next-steps)
+**Project:** IAM-Secure-Gate  
+**Phase Duration:** Weeks 1-4  
+**Status:** Planning → Implementation  
+**Last Updated:** December 2025
 
 ---
 
-## 🎯 Overview
+## Table of Contents
 
-**Phase 1 Goal:** Establish core IAM detection capabilities using AWS-native services.
-
-**Timeline:** Weeks 1-4  
-**Status:** Foundation Complete - Ready for Deployment  
-**Estimated Monthly Cost:** $2-5 (well within free tier limits)
-
-### What Phase 1 Delivers
-
-Phase 1 creates the **foundation** for real-time IAM misconfiguration detection by deploying:
-
-1. **Secure Storage Infrastructure** (S3 + KMS)
-
-   - CloudTrail logs storage
-   - AWS Config snapshots storage
-   - Access logs for audit trail
-
-2. **Logging & Monitoring** (Ready for Phase 1 Completion)
-
-   - CloudTrail for API activity
-   - AWS Config for resource changes
-   - IAM Access Analyzer for permission analysis
-
-3. **Centralized Security** (Ready for Phase 1 Completion)
-
-   - Security Hub for findings aggregation
-   - EventBridge for event routing
-   - CloudWatch for metrics visualization
-
-4. **Automation Infrastructure**
-   - Deployment scripts
-   - Verification suite
-   - Testing framework
+1. [Phase Overview](#phase-overview)
+2. [Objective & Acceptance Criteria](#objective--acceptance-criteria)
+3. [Architecture](#architecture)
+4. [Critical Decisions](#critical-decisions)
+5. [Implementation Plan](#implementation-plan)
+6. [Testing Strategy](#testing-strategy)
+7. [Cost Analysis](#cost-analysis)
+8. [Risks & Mitigations](#risks--mitigations)
+9. [Success Metrics](#success-metrics)
 
 ---
 
-## 🏗️ Architecture
+## Phase Overview
 
-### Current Implementation (S3 Foundation)
+### Goal
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AWS Account (eu-west-1)                  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────── ───┐  │
-│  │                 KMS Customer Key                      │  │
-│  │  ┌────────────────────────────────────────────┐       │  │
-│  │  │ • Automatic Rotation Enabled               │       │  │
-│  │  │ • CloudTrail Service Access                │       │  │
-│  │  │ • Config Service Access                    │       │  │
-│  │  │ • S3 Service Access                        │       │  │
-│  │  └────────────────────────────────────────────┘       │  │
-│  └──────────────────────────────────────────────────── ──┘  │
-│                           │                                 │
-│                           │ (encrypts)                      │
-│                           ▼                                 │
-│  ┌─────────────────────────────────────────────────── ───┐  │
-│  │              S3 Storage Infrastructure                │  │
-│  │  ┌────────────────────────────────────────────┐       │  │
-│  │  │ CloudTrail Bucket                          │       │  │
-│  │  │ • Versioning Enabled                       │       │  │
-│  │  │ • KMS Encrypted                            │       │  │
-│  │  │ • Public Access: BLOCKED                   │       │  │
-│  │  │ • HTTPS Only                               │       │  │
-│  │  │ • Access Logged → Logs Bucket              │       │  │
-│  │  │ • Lifecycle: 90d→IA, 180d→Glacier, 365d→Del│       │  │
-│  │  └────────────────────────────────────────────┘       │  │
-│  │                                                       │  │
-│  │  ┌────────────────────────────────────────────┐       │  │
-│  │  │ Config Bucket                              │       │  │
-│  │  │ • Versioning Enabled                       │       │  │
-│  │  │ • KMS Encrypted                            │       │  │
-│  │  │ • Public Access: BLOCKED                   │       │  │
-│  │  │ • HTTPS Only                               │       │  │
-│  │  │ • Access Logged → Logs Bucket              │       │  │
-│  │  │ • Lifecycle: 90d→IA, 180d→Glacier, 365d→Del│       │  │
-│  │  └────────────────────────────────────────────┘       │  │
-│  │                                                       │  │
-│  │  ┌────────────────────────────────────────────┐       │  │
-│  │  │ Access Logs Bucket                         │       │  │
-│  │  │ • Versioning Enabled                       │       │  │
-│  │  │ • KMS Encrypted                            │       │  │
-│  │  │ • Public Access: BLOCKED                   │       │  │
-│  │  │ • Lifecycle: 90d→IA, 365d→Delete           │       │  │
-│  │  └────────────────────────────────────────────┘       │  │
-│  └──────────────────────────────────────────────────── ──┘  │
-│                                                             │
-│  ┌──────────────────────────────────────────────────── ──┐  │
-│  │         Terraform Remote State (Optional)             │  │
-│  │  ┌────────────────────────────────────────────┐       │  │
-│  │  │ S3: iam-security-terraform-state-{account} │       │  │
-│  │  │ • Versioning: 90-day retention             │       │  │
-│  │  │ • Encryption: AES256                       │       │  │
-│  │  │ • Public Access: BLOCKED                   │       │  │
-│  │  └────────────────────────────────────────────┘       │  │
-│  │                                                       │  │
-│  │  ┌────────────────────────────────────────────┐       │  │
-│  │  │ DynamoDB: iam-security-terraform-locks     │       │  │
-│  │  │ • Billing: Pay-per-request                 │       │  │
-│  │  │ • Point-in-time recovery enabled           │       │  │
-│  │  └────────────────────────────────────────────┘       │  │
-│  └──────────────────────────────────────────────────── ──┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+Establish a **production-ready, AWS-native IAM misconfiguration detection pipeline** that continuously monitors IAM activity and surfaces security findings through a centralized dashboard, achieving sub-5-minute detection latency for critical violations.
 
-### Complete Phase 1 Architecture (To Be Built)
+### Scope (In Phase 1)
+
+✅ **Included:**
+
+- CloudTrail with encrypted S3 logging
+- AWS Config with IAM-focused compliance rules
+- IAM Access Analyzer for external access detection
+- Security Hub as centralized findings aggregator
+- EventBridge rules for sensitive IAM API call monitoring
+- CloudWatch dashboard for real-time visibility
+- Complete Terraform automation (local backend)
+- Test scenarios demonstrating 5+ misconfiguration detections
+
+❌ **Explicitly Out of Scope (Future Phases):**
+
+- Lambda-based remediation (Phase 2)
+- GitHub Actions PR security gate (Phase 3)
+- Grafana dashboards and feedback loops (Phase 4)
+- Advanced testing and documentation (Phase 5)
+
+### Why This Matters
+
+This phase establishes the **detection foundation** that all future phases depend on. Without reliable, fast detection, automated remediation (Phase 2) and preventive controls (Phase 3) cannot function effectively.
+
+---
+
+## Objective & Acceptance Criteria
+
+### Primary Objective
+
+Build and validate a multi-layered IAM misconfiguration detection system using AWS-native services, fully provisioned via Terraform, that detects critical security violations in under 5 minutes.
+
+### Acceptance Criteria (MVP)
+
+| **ID**  | **Criterion**              | **Measurement Method**                                       | **Target**         | **Priority** |
+| ------- | -------------------------- | ------------------------------------------------------------ | ------------------ | ------------ |
+| **AC1** | Detection Coverage         | Number of distinct IAM misconfiguration types detected       | ≥5 violation types | P0           |
+| **AC2** | Mean Time to Detect (MTTD) | CloudWatch timestamp: IAM API call → Security Hub finding    | <5 minutes         | P0           |
+| **AC3** | Infrastructure Deployment  | Terraform apply time with zero manual steps                  | <60 seconds        | P0           |
+| **AC4** | Finding Aggregation        | Percentage of detection sources integrated into Security Hub | 100%               | P0           |
+| **AC5** | Visibility                 | CloudWatch dashboard operational with real-time data         | Live updates       | P1           |
+| **AC6** | Repeatability              | Successful clean teardown and redeploy cycles                | 3 consecutive      | P1           |
+| **AC7** | Cost Compliance            | Monthly AWS spend for Phase 1 infrastructure                 | <$8/month          | P2           |
+
+**Priority Levels:**
+
+- **P0:** Must-have for MVP (blocks Phase 1 completion)
+- **P1:** Should-have for production-ready (quality requirement)
+- **P2:** Nice-to-have (can be adjusted if constraints require)
+
+---
+
+## Architecture
+
+### High-Level Detection Pipeline
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                         IAM Activity                              │
-│                    (API Calls, Changes, Events)                   │
-└───────────────────────┬───────────────────────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        │               │               │
-        ▼               ▼               ▼
-   ┌─────────┐   ┌───────────┐   ┌──────────────┐
-   │CloudTrail│  │AWS Config │   │IAM Access    │
-   │         │   │           │   │Analyzer      │
-   │• All IAM│   │• Resource │   │• External    │
-   │  API    │   │  Changes  │   │  Access      │
-   │  Calls  │   │• Rule Eval│   │• Policy      │
-   │• Multi  │   │• Snapshots│   │  Validation  │
-   │  Region │   │           │   │              │
-   └────┬────┘   └─────┬─────┘   └──────┬───────┘
-        │              │                │
-        │              │                │
-        │              └────────┬───────┘
-        │                       │
-        └───────────────────────┼─────────────────┐
-                                ▼                 │
-                        ┌──────────────┐          │
-                        │Security Hub  │          │
-                        │              │          │
-                        │• Aggregates  │          │
-                        │  Findings    │          │
-                        │• Normalizes  │          │
-                        │  Severity    │          │
-                        │• CIS         │          │
-                        │  Benchmark   │          │
-                        └──────┬───────┘          │
-                               │                  │
-                               ▼                  │
-                        ┌──────────────┐          │
-                        │EventBridge   │          │
-                        │              │          │
-                        │• IAM Events  │          │
-                        │• Route by    │          │
-                        │  Severity    │          │
-                        └──────┬───────┘          │
-                               │                  │
-                ┌──────────────┼──────────────┐   │
-                │              │              │   │
-                ▼              ▼              ▼   ▼
-         ┌──────────┐  ┌──────────┐  ┌──────────────┐
-         │CloudWatch│  │SNS       │  │S3 (Logs)     │
-         │Dashboard │  │Alerts    │  │              │
-         │          │  │          │  │• CloudTrail  │
-         │• MTTD    │  │• Email   │  │• Config      │
-         │• Findings│  │• Approval│  │• Access Logs │
-         │• Trends  │  │          │  │              │
-         └──────────┘  └──────────┘  └──────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                     AWS Account (Single Region: eu-west-1)           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │                    IAM Activity Layer                      │       │
+│  │  - User actions (console, CLI, SDK)                       │       │
+│  │  - Service-to-service IAM operations                      │       │
+│  │  - Policy modifications, access key lifecycle            │       │
+│  └───────────────────────────┬──────────────────────────────┘       │
+│                               ↓                                       │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │                    Detection Layer                         │       │
+│  │                                                            │       │
+│  │  ┌──────────────┐      ┌──────────────┐                  │       │
+│  │  │  CloudTrail  │      │ EventBridge  │                  │       │
+│  │  │  (All IAM    │──┬──→│   Rules      │                  │       │
+│  │  │   API calls) │  │   │  (Sensitive  │                  │       │
+│  │  └──────────────┘  │   │   patterns)  │                  │       │
+│  │         ↓          │   └──────────────┘                  │       │
+│  │  ┌──────────────┐  │          ↓                          │       │
+│  │  │      S3      │  │   CloudWatch Logs                   │       │
+│  │  │ (Encrypted)  │  │   (IAM API metrics)                 │       │
+│  │  └──────────────┘  │                                      │       │
+│  │                    │                                      │       │
+│  │  ┌──────────────┐  │   ┌──────────────┐                  │       │
+│  │  │ AWS Config   │  │   │ IAM Access   │                  │       │
+│  │  │ - 3 IAM Rules│  │   │  Analyzer    │                  │       │
+│  │  │ - Continuous │  │   │ (External    │                  │       │
+│  │  │   compliance │  │   │  access)     │                  │       │
+│  │  └──────────────┘  │   └──────────────┘                  │       │
+│  │         ↓          │          ↓                          │       │
+│  │  ┌──────────────┐  │   ┌──────────────┐                  │       │
+│  │  │      S3      │  │   │   Findings   │                  │       │
+│  │  │ (Snapshots)  │  │   │              │                  │       │
+│  │  └──────────────┘  │   └──────────────┘                  │       │
+│  └────────────────────┼──────────────────┼──────────────────┘       │
+│                       ↓                  ↓                           │
+│  ┌─────────────────────────────────────────────────────────┐        │
+│  │                  Aggregation Layer                       │        │
+│  │                                                           │        │
+│  │               ┌──────────────────────┐                   │        │
+│  │               │   Security Hub       │                   │        │
+│  │               │ ┌──────────────────┐ │                   │        │
+│  │               │ │ Foundational     │ │                   │        │
+│  │               │ │ Best Practices   │ │                   │        │
+│  │               │ └──────────────────┘ │                   │        │
+│  │               │ ┌──────────────────┐ │                   │        │
+│  │               │ │ CIS Benchmark    │ │                   │        │
+│  │               │ └──────────────────┘ │                   │        │
+│  │               │                      │                   │        │
+│  │               │ Normalized Findings  │                   │        │
+│  │               │ (ASFF Format)        │                   │        │
+│  │               └──────────────────────┘                   │        │
+│  └─────────────────────────┬───────────────────────────────┘        │
+│                             ↓                                         │
+│  ┌─────────────────────────────────────────────────────────┐        │
+│  │                  Visualization Layer                     │        │
+│  │                                                           │        │
+│  │            CloudWatch Dashboard (4 Widgets)              │        │
+│  │  ┌────────────────┐  ┌────────────────┐                 │        │
+│  │  │ IAM API Call   │  │ Security Hub   │                 │        │
+│  │  │ Volume         │  │ Findings by    │                 │        │
+│  │  │                │  │ Severity       │                 │        │
+│  │  └────────────────┘  └────────────────┘                 │        │
+│  │  ┌────────────────┐  ┌────────────────┐                 │        │
+│  │  │ Config Rule    │  │ Access Analyzer│                 │        │
+│  │  │ Compliance     │  │ Active Findings│                 │        │
+│  │  └────────────────┘  └────────────────┘                 │        │
+│  └─────────────────────────────────────────────────────────┘        │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Responsibilities
+
+| **Component**           | **Role**                  | **Detection Method**              | **Latency**                        | **Output**                   |
+| ----------------------- | ------------------------- | --------------------------------- | ---------------------------------- | ---------------------------- |
+| **CloudTrail**          | Audit logging             | Records all IAM API calls         | ~5 seconds                         | S3 logs + EventBridge events |
+| **AWS Config**          | Compliance checking       | Evaluates resources against rules | 1-15 minutes                       | Config findings              |
+| **IAM Access Analyzer** | External access detection | Analyzes resource policies        | 1-30 minutes                       | Analyzer findings            |
+| **EventBridge**         | Real-time routing         | Pattern matching on API calls     | <1 second                          | CloudWatch Logs/Metrics      |
+| **Security Hub**        | Finding aggregation       | Ingests from all sources          | <1 minute (after source detection) | Normalized ASFF findings     |
+| **CloudWatch**          | Metrics & visualization   | Displays aggregated data          | Real-time                          | Dashboard widgets            |
+
+---
+
+## Critical Decisions
+
+### Decision Log
+
+#### Decision 1: KMS Encryption Strategy
+
+**Question:** Single KMS key or separate keys per service?
+
+**Options:**
+
+- **Option A:** Single KMS key for all logging/detection services
+  - Pros: Simplified key management, lower cost ($1/key/month)
+  - Cons: Broader access scope if key compromised
+- **Option B:** Separate keys per service (CloudTrail, Config, S3)
+  - Pros: Better isolation, granular access control
+  - Cons: 3x key cost ($3/month), complex key policy management
+
+**Decision:** ✅ **Option A - Single KMS Key**  
+**Rationale:** For a student project with trusted single operator, complexity doesn't justify the benefit. Cost savings ($2/month) matter for budget constraints.
+
+**Implementation:**
+
+```hcl
+resource "aws_kms_key" "detection_logs" {
+  description             = "IAM-Secure-Gate Phase 1 Detection Logs"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+}
 ```
 
 ---
 
-## 🔧 Components
+#### Decision 2: AWS Config Rules Selection
 
-### Currently Deployed: S3 Foundation
+**Question:** Which 5 IAM rules, given budget constraint of ~$2/rule/month?
 
-#### 1. S3 Buckets (3 buckets)
+**Options:**
 
-**CloudTrail Bucket** (`iam-security-dev-cloudtrail-{account-id}`)
+- **Option A:** 5 rules ($10/month) - Exceeds budget
+- **Option B:** 3 rules ($6/month) - Fits budget
+- **Option C:** 2 rules ($4/month) - Maximum safety margin
 
-- **Purpose:** Store CloudTrail API activity logs
-- **Retention:** 365 days with lifecycle transitions
-- **Security:**
-  - KMS encryption
-  - Versioning enabled
-  - Public access blocked (all 4 controls)
-  - HTTPS-only policy
-  - Access logging enabled
+**Decision:** ✅ **Option B - 3 Core Rules**  
+**Rationale:** Balance between coverage and cost. 3 rules detect the most critical IAM violations while staying near budget.
 
-**Config Bucket** (`iam-security-dev-config-{account-id}`)
+**Selected Rules:**
 
-- **Purpose:** Store AWS Config snapshots and history
-- **Retention:** 365 days with lifecycle transitions
-- **Security:** Same as CloudTrail bucket
+1. **`iam-root-access-key-check`**
+   - Detects: Root account access keys (critical security violation)
+   - Severity: CRITICAL
+   - Remediation: Auto-delete in Phase 2
+2. **`iam-user-mfa-enabled`**
+   - Detects: IAM users without MFA for console access
+   - Severity: HIGH
+   - Remediation: SNS notification for manual fix
+3. **`iam-policy-no-statements-with-admin-access`**
+   - Detects: Policies granting `AdministratorAccess` or equivalent
+   - Severity: HIGH
+   - Remediation: Auto-replace with least-privilege policy in Phase 2
 
-**Logs Bucket** (`iam-security-dev-logs-{account-id}`)
+**Future Addition (if budget allows):** 4. `access-keys-rotated` (keys older than 90 days) 5. `iam-user-no-policies-check` (direct user policy attachments)
 
-- **Purpose:** Store S3 access logs for audit trail
-- **Retention:** 365 days
-- **Security:** Same as above (except no self-logging)
+---
 
-**Lifecycle Policy (All Buckets):**
+#### Decision 3: Config Snapshot Delivery Frequency
 
-```
-Day 0-90:    Standard Storage (hot access)
-Day 90-180:  Standard-IA (30% cheaper, infrequent access)
-Day 180-365: Glacier (70% cheaper, archive)
-Day 365+:    Automatic deletion
-```
+**Question:** How often should Config take configuration snapshots?
 
-#### 2. KMS Key
+**Options:**
 
-**S3 Encryption Key** (`iam-security-dev-s3-kms`)
+- **6 hours:** More frequent compliance checks, higher evaluation costs
+- **12 hours:** Balanced approach
+- **24 hours:** Lowest cost, still meets audit requirements
 
-- **Type:** Customer-managed key (CMK)
-- **Rotation:** Automatic (yearly)
-- **Permissions:** CloudTrail, Config, S3 services
-- **Cost:** $1/month
-- **Alias:** `alias/iam-security-dev-s3`
+**Decision:** ✅ **24 Hours**  
+**Rationale:** Phase 1 focuses on real-time detection via EventBridge/CloudTrail. Config snapshots are for compliance audit trail, not real-time detection. 24-hour frequency meets CIS benchmark requirements.
 
-**Why KMS over AES256?**
+---
 
-- Audit trail of encryption/decryption
-- Centralized key management
-- Compliance requirements (GDPR, SOC 2)
-- Key rotation capability
+#### Decision 4: EventBridge Rule Patterns
 
-#### 3. Terraform Backend (Optional)
+**Question:** Which IAM API calls are "sensitive" enough to warrant real-time routing?
 
-**State Bucket** (`iam-security-terraform-state-{account-id}`)
+**Decision:** ✅ **3 High-Risk Pattern Categories**
 
-- **Purpose:** Store Terraform state remotely
-- **Benefits:**
-  - Team collaboration
-  - State locking (prevents concurrent changes)
-  - Version history
-  - Secure storage
-
-**Lock Table** (`iam-security-terraform-locks`)
-
-- **Type:** DynamoDB table
-- **Billing:** Pay-per-request (no minimum cost)
-- **Purpose:** Prevent concurrent Terraform operations
-
-### To Be Deployed (Phase 1 Completion)
-
-#### 4. CloudTrail
-
-**Trail Configuration:**
-
-- **Name:** `iam-security-audit-trail`
-- **Type:** Multi-region trail
-- **Events:**
-  - Management events (all IAM API calls)
-  - Global service events (IAM, STS, CloudFront)
-- **Destination:** CloudTrail S3 bucket
-- **Encryption:** KMS key
-- **Cost:** FREE (first trail per account)
-
-**What It Captures:**
+**Pattern 1: Policy Modifications (Privilege Changes)**
 
 ```json
 {
-  "eventName": "AttachUserPolicy",
-  "userIdentity": {
-    "type": "IAMUser",
-    "userName": "admin"
-  },
-  "requestParameters": {
-    "userName": "developer",
-    "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+  "source": ["aws.iam"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "eventName": [
+      "PutUserPolicy",
+      "PutRolePolicy",
+      "PutGroupPolicy",
+      "AttachUserPolicy",
+      "AttachRolePolicy",
+      "AttachGroupPolicy",
+      "DeleteUserPolicy",
+      "DeleteRolePolicy",
+      "DeleteGroupPolicy",
+      "DetachUserPolicy",
+      "DetachRolePolicy",
+      "DetachGroupPolicy"
+    ]
   }
 }
 ```
 
-#### 5. AWS Config
-
-**Configuration Recorder:**
-
-- **Resources:** IAM (Policy, Role, User, Group)
-- **Delivery:** Config S3 bucket
-- **Cost:** FREE for first 20,000 rule evaluations/month
-
-**Config Rules (5 rules):**
-
-1. `iam-policy-no-statements-with-admin-access`
-
-   - Detects policies with `Action: "*"`
-   - Severity: HIGH
-
-2. `iam-root-access-key-check`
-
-   - Ensures root account has no access keys
-   - Severity: CRITICAL
-
-3. `mfa-enabled-for-iam-console-access`
-
-   - Checks MFA on console users
-   - Severity: MEDIUM
-
-4. `iam-user-no-policies-check`
-
-   - Ensures no policies attached directly to users
-   - Severity: LOW
-
-5. `iam-password-policy`
-   - Validates password complexity requirements
-   - Severity: MEDIUM
-
-#### 6. IAM Access Analyzer
-
-**Analyzer Type:** ACCOUNT
-
-- **Purpose:** Detect resources shared outside account
-- **Checks:** Trust policies, resource policies
-- **Cost:** FREE
-- **Integration:** Sends findings to Security Hub
-
-#### 7. Security Hub
-
-**Purpose:** Centralized security findings dashboard
-
-**Enabled Standards:**
-
-- AWS Foundational Security Best Practices
-- CIS AWS Foundations Benchmark v1.4.0
-
-**Cost:**
-
-- 30-day free trial
-- Then $0.0010 per finding-check/month
-- Estimated: $0.10-0.50/month for dev
-
-#### 8. EventBridge Rules
-
-**IAM Event Rules (3 rules):**
-
-1. `iam-high-severity-findings`
-
-   - **Trigger:** Security Hub finding (HIGH/CRITICAL)
-   - **Filter:** IAM resources only
-   - **Action:** SNS notification + CloudWatch log
-
-2. `iam-policy-changes`
-
-   - **Trigger:** CloudTrail API calls
-   - **Filter:** CreatePolicy, AttachUserPolicy, etc.
-   - **Action:** Log to CloudWatch
-
-3. `iam-trust-policy-changes`
-   - **Trigger:** UpdateAssumeRolePolicy
-   - **Action:** SNS notification
-
-**Cost:** FREE (first 1M events/month)
-
-#### 9. CloudWatch Dashboard
-
-**Metrics Displayed:**
-
-- IAM findings per day
-- Security Hub compliance score
-- Config rule compliance
-- CloudTrail event volume
-
-**Cost:** $0.30/month per dashboard
-
----
-
-## 💰 Cost Analysis
-
-### Current Deployment (S3 Only)
-
-| Resource              | Quantity | Unit Cost   | Monthly Cost     |
-| --------------------- | -------- | ----------- | ---------------- |
-| S3 Storage (Standard) | ~0.5 GB  | $0.023/GB   | $0.01            |
-| S3 Storage (IA)       | ~0.2 GB  | $0.0125/GB  | $0.003           |
-| S3 Storage (Glacier)  | ~0.3 GB  | $0.004/GB   | $0.001           |
-| KMS Key               | 1 key    | $1.00/month | $1.00            |
-| S3 Requests           | ~1,000   | $0.005/1000 | $0.005           |
-| **TOTAL (S3 Only)**   |          |             | **~$1.02/month** |
-
-### Full Phase 1 Deployment
-
-| Resource                 | Quantity        | Unit Cost           | Monthly Cost          |
-| ------------------------ | --------------- | ------------------- | --------------------- |
-| S3 Storage (all tiers)   | 1 GB            | Various             | $0.02                 |
-| KMS Key                  | 1 key           | $1.00/month         | $1.00                 |
-| CloudTrail               | 1 trail         | FREE                | $0.00                 |
-| AWS Config               | 5 rules         | FREE (under 20k/mo) | $0.00                 |
-| IAM Access Analyzer      | 1 analyzer      | FREE                | $0.00                 |
-| Security Hub             | Est. findings   | $0.001/check        | $0.20                 |
-| EventBridge              | <10k events     | FREE                | $0.00                 |
-| CloudWatch Dashboard     | 1 dashboard     | $0.30/month         | $0.30                 |
-| DynamoDB (optional)      | Pay-per-request | FREE tier           | $0.00                 |
-| **TOTAL (Full Phase 1)** |                 |                     | **~$1.52-2.00/month** |
-
-### Cost Optimization Features
-
-1. **Lifecycle Policies:** 56% storage cost reduction
-2. **Free Tier Services:** CloudTrail, Config, Access Analyzer, EventBridge
-3. **Pay-per-request:** DynamoDB (no idle costs)
-4. **Bucket Keys:** Reduced KMS API costs
-5. **Automatic Cleanup:** Old logs deleted after 365 days
-
-### Annual Cost Projection
-
-```
-Monthly: $2.00
-Annual:  $24.00
-
-vs. Security Breach Cost: $100,000+ (average for SMB)
-ROI: 4,166x
-```
-
----
-
-## 🔒 Security Features
-
-### Defense in Depth (7 Layers)
-
-#### Layer 1: Encryption at Rest
-
-- **KMS CMK:** Customer-managed encryption keys
-- **Automatic Rotation:** Yearly key rotation
-- **Audit Trail:** CloudTrail logs all KMS operations
-
-#### Layer 2: Encryption in Transit
-
-- **HTTPS Only:** Bucket policy denies HTTP requests
-- **TLS 1.2+:** Modern encryption standards
-- **Condition:** `aws:SecureTransport = false` → DENY
-
-#### Layer 3: Access Control
-
-- **Public Access Block:** All 4 controls enabled
-  - BlockPublicAcls: true
-  - IgnorePublicAcls: true
-  - BlockPublicPolicy: true
-  - RestrictPublicBuckets: true
-- **Bucket Ownership:** Enforced (prevents ACL confusion)
-- **Service Principals:** Scoped to CloudTrail/Config
-
-#### Layer 4: Audit Logging
-
-- **Access Logs:** All S3 operations logged
-- **CloudTrail:** All IAM API calls logged
-- **Config:** All resource changes logged
-- **Retention:** 365 days for compliance
-
-#### Layer 5: Data Lifecycle
-
-- **Versioning:** Enabled (protects against deletion)
-- **Lifecycle Rules:** Automatic archival
-- **90-day Retention:** Old state versions deleted
-- **Point-in-time Recovery:** DynamoDB backups
-
-#### Layer 6: Monitoring & Alerting
-
-- **Security Hub:** Centralized findings
-- **EventBridge:** Real-time event routing
-- **CloudWatch:** Metrics and dashboards
-- **SNS:** Email/SMS notifications
-
-#### Layer 7: Compliance & Governance
-
-- **Resource Tagging:** Project, Environment, Owner
-- **CIS Benchmark:** Alignment with industry standards
-- **GDPR:** Data encryption, audit logs
-- **SOC 2:** Access controls, monitoring
-
-### Bucket Policy Example
+**Pattern 2: Trust Relationship Changes (Lateral Movement Risk)**
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "DenyInsecureTransport",
-      "Effect": "Deny",
-      "Principal": "*",
-      "Action": "s3:*",
-      "Resource": ["arn:aws:s3:::bucket-name", "arn:aws:s3:::bucket-name/*"],
-      "Condition": {
-        "Bool": {
-          "aws:SecureTransport": "false"
-        }
-      }
-    },
-    {
-      "Sid": "DenyUnencryptedObjectUploads",
-      "Effect": "Deny",
-      "Principal": "*",
-      "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::bucket-name/*",
-      "Condition": {
-        "StringNotEquals": {
-          "s3:x-amz-server-side-encryption": "AES256"
-        }
-      }
+  "source": ["aws.iam"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "eventName": ["UpdateAssumeRolePolicy"]
+  }
+}
+```
+
+**Pattern 3: Root Account Activity (Critical Security Event)**
+
+```json
+{
+  "source": ["aws.iam"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "userIdentity": {
+      "type": ["Root"]
     }
+  }
+}
+```
+
+**Target for Phase 1:** CloudWatch Log Groups (for metrics extraction)  
+**Target for Phase 2:** Lambda functions (for auto-remediation)
+
+---
+
+#### Decision 5: Security Hub Standards
+
+**Question:** Which compliance standards to enable?
+
+**Options:**
+
+- AWS Foundational Security Best Practices only
+- CIS AWS Foundations Benchmark only
+- Both standards
+
+**Decision:** ✅ **Both Standards**  
+**Rationale:** Both are free, and they complement each other:
+
+- **Foundational:** Broader coverage (100+ controls across services)
+- **CIS:** IAM-specific depth (27 IAM-related controls)
+
+**Cost:** $0 (standards are free, only pay $0.0010 per finding ingested)
+
+---
+
+#### Decision 6: CloudWatch Dashboard Widgets
+
+**Question:** What metrics provide the most value for Phase 1 monitoring?
+
+**Decision:** ✅ **4-Widget Dashboard**
+
+| **Widget**                            | **Data Source**          | **Metric/Query**                                           | **Purpose**                          |
+| ------------------------------------- | ------------------------ | ---------------------------------------------------------- | ------------------------------------ |
+| **IAM API Call Volume**               | CloudWatch Logs Insights | `filter @message like /IAM/ \| stats count() by eventName` | Detect unusual spike in IAM activity |
+| **Security Hub Findings by Severity** | Security Hub API         | `Severity.Label` aggregation                               | Prioritize remediation efforts       |
+| **Config Compliance Status**          | AWS Config               | `ComplianceByConfigRule`                                   | Track rule compliance over time      |
+| **Access Analyzer Active Findings**   | IAM Access Analyzer      | `FindingCount` by `Status=ACTIVE`                          | Monitor external access grants       |
+
+**Update Frequency:** 1-minute refresh (CloudWatch default)
+
+---
+
+#### Decision 7: S3 Lifecycle Policies
+
+**Question:** How long to retain logs before deletion/archival?
+
+**Decision:** ✅ **Tiered Retention Strategy**
+
+| **Log Type**         | **Hot Storage** | **Glacier** | **Deletion**   | **Rationale**                           |
+| -------------------- | --------------- | ----------- | -------------- | --------------------------------------- |
+| **CloudTrail**       | 30 days         | 31-90 days  | After 90 days  | CIS Benchmark requires 90-day retention |
+| **Config Snapshots** | 90 days         | 91-365 days | After 365 days | Annual compliance audit requirement     |
+
+**Cost Impact:**
+
+- S3 Standard (30 days): ~$0.023/GB/month
+- Glacier Flexible (60 days): ~$0.004/GB/month
+- **Total for Phase 1:** ~$1-2/month (assuming <50GB logs)
+
+---
+
+#### Decision 8: Tagging Strategy
+
+**Question:** What tags should be applied to all Phase 1 resources?
+
+**Decision:** ✅ **7-Tag Standard Schema**
+
+```hcl
+locals {
+  phase_1_tags = {
+    Project     = "IAM-Secure-Gate"
+    Phase       = "Phase-1-Detection"
+    Environment = var.environment # dev/prod
+    ManagedBy   = "Terraform"
+    Owner       = "Steins"         # Your name
+    CostCenter  = "University-FYP"
+    Repository  = "github.com/yourusername/iam-secure-gate"
+  }
+}
+```
+
+**Benefits:**
+
+- Cost allocation reports by Phase
+- Resource filtering in AWS Console
+- Compliance audit trail (ManagedBy=Terraform)
+- Ownership tracking for multi-contributor projects
+
+---
+
+#### Decision 9: Region Selection
+
+**Question:** Single region or multi-region deployment?
+
+**Decision:** ✅ **Single Region: `eu-west-1` (Ireland)**  
+**Rationale:**
+
+- IAM is a global service (changes in any region are logged)
+- CloudTrail can be configured as multi-region trail (logs from all regions)
+- Cost optimization for student project
+- eu-west-1 chosen as user's home region (Dublin, Ireland - low latency)
+- Future phases can add regional aggregation
+
+**Important IAM Console Note:**  
+While we deploy detection infrastructure in eu-west-1, the AWS IAM console always defaults to showing "Global" or "us-east-1" in the region selector. This is normal behavior - IAM is a global service and your CloudTrail multi-region trail in eu-west-1 will capture all IAM API calls regardless of where they appear to originate in the console.
+
+**Trade-off Accepted:** Regional AWS services (e.g., S3, Lambda in other regions) won't be monitored by Config rules, but IAM is global so no gap in IAM detection.
+
+---
+
+#### Decision 10: Terraform Backend
+
+**Question:** Local state file or remote backend (S3 + DynamoDB)?
+
+**Decision:** ✅ **Local Backend for Phase 1**  
+**Rationale:**
+
+- Single developer, no collaboration state conflicts
+- Avoids bootstrap chicken-egg problem (need S3 before Terraform?)
+- Zero backend infrastructure cost
+- Can migrate to remote backend in Phase 4 if needed
+
+**Security Measures:**
+
+- ✅ `.gitignore` includes `*.tfstate*`, `.terraform/`
+- ✅ State file encrypted at rest (Windows EFS/BitLocker)
+- ✅ No state file committed to Git (verified in pre-commit hook)
+
+---
+
+## Implementation Plan
+
+### Module Structure
+
+```
+terraform/
+├── modules/
+│   ├── foundation/           # KMS key + S3 buckets
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md
+│   ├── cloudtrail/           # CloudTrail configuration
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md
+│   ├── config/               # AWS Config + Rules
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md
+│   ├── access-analyzer/      # IAM Access Analyzer
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md
+│   ├── security-hub/         # Security Hub + Standards
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md
+│   ├── eventbridge/          # EventBridge Rules + Targets
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md
+│   └── dashboard/            # CloudWatch Dashboard
+│       ├── main.tf
+│       ├── variables.tf
+│       ├── outputs.tf
+│       └── README.md
+└── environments/
+    └── dev/
+        ├── main.tf           # Root module (orchestrates all modules)
+        ├── variables.tf      # Environment-specific variables
+        ├── outputs.tf        # Outputs for verification
+        ├── terraform.tfvars  # Variable values (gitignored)
+        └── README.md         # Deployment instructions
+```
+
+### Build Order & Dependencies
+
+#### **Step 1: Foundation Module** (Week 1, Days 1-2)
+
+**Estimated Time:** 3 hours  
+**Priority:** P0 (blocking all other modules)
+
+**Resources:**
+
+```hcl
+# KMS Key for encryption
+resource "aws_kms_key" "detection_logs"
+resource "aws_kms_alias" "detection_logs"
+
+# S3 Bucket for CloudTrail
+resource "aws_s3_bucket" "cloudtrail_logs"
+resource "aws_s3_bucket_versioning" "cloudtrail_logs"
+resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail_logs"
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail_logs"
+resource "aws_s3_bucket_public_access_block" "cloudtrail_logs"
+resource "aws_s3_bucket_policy" "cloudtrail_logs"
+
+# S3 Bucket for Config Snapshots
+resource "aws_s3_bucket" "config_snapshots"
+resource "aws_s3_bucket_versioning" "config_snapshots"
+resource "aws_s3_bucket_lifecycle_configuration" "config_snapshots"
+resource "aws_s3_bucket_server_side_encryption_configuration" "config_snapshots"
+resource "aws_s3_bucket_public_access_block" "config_snapshots"
+resource "aws_s3_bucket_policy" "config_snapshots"
+```
+
+**Outputs:**
+
+- `kms_key_id`: For use by CloudTrail/Config
+- `cloudtrail_bucket_name`: For CloudTrail module
+- `config_bucket_name`: For Config module
+
+**Acceptance Test:**
+
+```bash
+# Verify buckets exist and are encrypted
+aws s3api get-bucket-encryption --bucket <cloudtrail-bucket-name>
+aws s3api get-bucket-versioning --bucket <config-bucket-name>
+```
+
+---
+
+#### **Step 2: CloudTrail Module** (Week 1, Days 3-4)
+
+**Estimated Time:** 2 hours  
+**Dependencies:** Foundation module  
+**Priority:** P0
+
+**Resources:**
+
+```hcl
+resource "aws_cloudtrail" "main" {
+  name                          = "iam-secure-gate-trail"
+  s3_bucket_name                = var.cloudtrail_bucket_name
+  include_global_service_events = true
+  is_multi_region_trail         = true
+  enable_log_file_validation    = true
+  kms_key_id                    = var.kms_key_id
+
+  event_selector {
+    read_write_type           = "All"
+    include_management_events = true
+  }
+}
+```
+
+**Acceptance Test:**
+
+```bash
+# Create test IAM user and verify CloudTrail logged it
+aws iam create-user --user-name test-trail-user
+aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=CreateUser
+```
+
+---
+
+#### **Step 3: AWS Config Module** (Week 1-2, Days 5-7)
+
+**Estimated Time:** 4 hours  
+**Dependencies:** Foundation module  
+**Priority:** P0
+
+**Resources:**
+
+```hcl
+# IAM Role for Config
+resource "aws_iam_role" "config"
+resource "aws_iam_role_policy_attachment" "config"
+
+# Configuration Recorder
+resource "aws_config_configuration_recorder" "main"
+resource "aws_config_delivery_channel" "main"
+resource "aws_config_configuration_recorder_status" "main"
+
+# 3 IAM Rules
+resource "aws_config_config_rule" "iam_root_access_key_check"
+resource "aws_config_config_rule" "iam_user_mfa_enabled"
+resource "aws_config_config_rule" "iam_policy_no_admin_access"
+```
+
+**Acceptance Test:**
+
+```bash
+# Create IAM user without MFA, verify Config detects non-compliance
+aws iam create-user --user-name test-no-mfa-user
+aws iam create-login-profile --user-name test-no-mfa-user --password TempPass123!
+# Wait 5-10 minutes for Config evaluation
+aws configservice describe-compliance-by-config-rule --config-rule-names iam-user-mfa-enabled
+```
+
+---
+
+#### **Step 4: IAM Access Analyzer Module** (Week 2, Day 1)
+
+**Estimated Time:** 1 hour  
+**Dependencies:** None  
+**Priority:** P1
+
+**Resources:**
+
+```hcl
+resource "aws_accessanalyzer_analyzer" "account" {
+  analyzer_name = "iam-secure-gate-analyzer"
+  type          = "ACCOUNT"
+
+  tags = local.phase_1_tags
+}
+```
+
+**Acceptance Test:**
+
+```bash
+# Create IAM role with external trust, verify analyzer detects it
+aws iam create-role --role-name test-external-trust \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+# Wait 1-5 minutes
+aws accessanalyzer list-findings --analyzer-arn <analyzer-arn>
+```
+
+---
+
+#### **Step 5: Security Hub Module** (Week 2, Days 2-3)
+
+**Estimated Time:** 2 hours  
+**Dependencies:** CloudTrail, Config, Access Analyzer (for findings integration)  
+**Priority:** P0
+
+**Resources:**
+
+```hcl
+resource "aws_securityhub_account" "main"
+
+resource "aws_securityhub_standards_subscription" "foundational" {
+  standards_arn = "arn:aws:securityhub:eu-west-1::standards/aws-foundational-security-best-practices/v/1.0.0"
+}
+
+resource "aws_securityhub_standards_subscription" "cis" {
+  standards_arn = "arn:aws:securityhub:eu-west-1::standards/cis-aws-foundations-benchmark/v/1.2.0"
+}
+```
+
+**Acceptance Test:**
+
+```bash
+# Verify Security Hub ingesting findings from Config and Access Analyzer
+aws securityhub get-findings --filters '{"ProductName":[{"Value":"Config","Comparison":"EQUALS"}]}' --max-items 5
+aws securityhub get-findings --filters '{"ProductName":[{"Value":"IAM Access Analyzer","Comparison":"EQUALS"}]}' --max-items 5
+```
+
+---
+
+#### **Step 6: EventBridge Module** (Week 2, Days 4-5)
+
+**Estimated Time:** 3 hours  
+**Dependencies:** CloudTrail  
+**Priority:** P1
+
+**Resources:**
+
+```hcl
+# CloudWatch Log Groups for each pattern
+resource "aws_cloudwatch_log_group" "iam_policy_changes"
+resource "aws_cloudwatch_log_group" "trust_policy_changes"
+resource "aws_cloudwatch_log_group" "root_account_activity"
+
+# EventBridge Rules
+resource "aws_cloudwatch_event_rule" "iam_policy_changes"
+resource "aws_cloudwatch_event_rule" "trust_policy_changes"
+resource "aws_cloudwatch_event_rule" "root_account_activity"
+
+# EventBridge Targets (CloudWatch Logs)
+resource "aws_cloudwatch_event_target" "iam_policy_changes"
+resource "aws_cloudwatch_event_target" "trust_policy_changes"
+resource "aws_cloudwatch_event_target" "root_account_activity"
+```
+
+**Acceptance Test:**
+
+```bash
+# Attach policy to test user, verify EventBridge rule triggered
+aws iam attach-user-policy --user-name test-user --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+# Check CloudWatch Logs
+aws logs tail /aws/events/iam-policy-changes --follow
+```
+
+---
+
+#### **Step 7: CloudWatch Dashboard Module** (Week 3, Days 1-3)
+
+**Estimated Time:** 4 hours (JSON dashboard body is tedious)  
+**Dependencies:** All detection services operational  
+**Priority:** P1
+
+**Resources:**
+
+```hcl
+resource "aws_cloudwatch_dashboard" "iam_security" {
+  dashboard_name = "IAM-Security-Phase1"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      # Widget 1: IAM API Call Volume
+      # Widget 2: Security Hub Findings by Severity
+      # Widget 3: Config Rule Compliance
+      # Widget 4: Access Analyzer Active Findings
+    ]
+  })
+}
+```
+
+**Acceptance Test:**
+
+```bash
+# Open dashboard in AWS Console, verify all 4 widgets displaying data
+aws cloudwatch get-dashboard --dashboard-name IAM-Security-Phase1
+```
+
+---
+
+#### **Step 8: Root Module Integration** (Week 3, Days 4-5)
+
+**Estimated Time:** 2 hours  
+**Priority:** P0
+
+**File:** `terraform/environments/dev/main.tf`
+
+```hcl
+module "foundation" {
+  source = "../../modules/foundation"
+  # ... variables
+}
+
+module "cloudtrail" {
+  source              = "../../modules/cloudtrail"
+  cloudtrail_bucket_name = module.foundation.cloudtrail_bucket_name
+  kms_key_id          = module.foundation.kms_key_id
+  depends_on          = [module.foundation]
+}
+
+module "config" {
+  source            = "../../modules/config"
+  config_bucket_name = module.foundation.config_bucket_name
+  kms_key_id        = module.foundation.kms_key_id
+  depends_on        = [module.foundation]
+}
+
+module "access_analyzer" {
+  source = "../../modules/access-analyzer"
+}
+
+module "security_hub" {
+  source     = "../../modules/security-hub"
+  depends_on = [
+    module.cloudtrail,
+    module.config,
+    module.access_analyzer
+  ]
+}
+
+module "eventbridge" {
+  source     = "../../modules/eventbridge"
+  depends_on = [module.cloudtrail]
+}
+
+module "dashboard" {
+  source     = "../../modules/dashboard"
+  depends_on = [
+    module.security_hub,
+    module.config,
+    module.access_analyzer,
+    module.eventbridge
   ]
 }
 ```
 
----
+**Acceptance Test:**
 
-## 📋 Prerequisites
-
-### Required Tools
-
-1. **Terraform** >= 1.5.0
-
-   ```powershell
-   # Install with Chocolatey
-   choco install terraform
-
-   # Or download from
-   https://www.terraform.io/downloads
-   ```
-
-2. **AWS CLI** >= 2.0
-
-   ```powershell
-   # Install with winget
-   winget install Amazon.AWSCLI
-
-   # Or download from
-   https://aws.amazon.com/cli/
-   ```
-
-3. **PowerShell** >= 5.1 (included in Windows 10/11)
-
-4. **Git** (for version control)
-   ```powershell
-   winget install Git.Git
-   ```
-
-### AWS Account Setup
-
-1. **IAM User with Permissions:**
-
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": [
-           "s3:*",
-           "kms:*",
-           "dynamodb:*",
-           "cloudtrail:*",
-           "config:*",
-           "access-analyzer:*",
-           "securityhub:*",
-           "events:*",
-           "cloudwatch:*",
-           "sns:*",
-           "iam:CreateServiceLinkedRole"
-         ],
-         "Resource": "*"
-       }
-     ]
-   }
-   ```
-
-2. **Access Keys Generated:**
-
-   - AWS_ACCESS_KEY_ID
-   - AWS_SECRET_ACCESS_KEY
-
-3. **AWS CLI Configured:**
-   ```bash
-   aws configure --profile IAM-Secure-Gate
-   # Enter: Access Key, Secret Key, eu-west-1, json
-   ```
-
-### Verification Commands
-
-```powershell
-# Check Terraform
-terraform version
-# Expected: Terraform v1.5.0 or later
-
-# Check AWS CLI
-aws --version
-# Expected: aws-cli/2.x or later
-
-# Check AWS Access
-aws sts get-caller-identity --profile IAM-Secure-Gate
-# Expected: Your account ID and user ARN
-
-# Check Region
-aws configure get region --profile IAM-Secure-Gate
-# Expected: eu-west-1
-```
-
----
-
-## 🚀 Deployment Guide
-
-### Quick Start (10 Minutes)
-
-#### Step 1: Clone Repository
-
-```powershell
-git clone https://github.com/yourusername/IAM-Secure-Gate.git
-cd IAM-Secure-Gate
-```
-
-#### Step 2: Set Up AWS Environment
-
-```powershell
-.\scripts\Set-AWSEnvironment.ps1
-
-# Expected output:
-# ✅ AWS Environment Configured
-# Profile: IAM-Secure-Gate
-# Region: eu-west-1
-# Account ID: 826232761554
-```
-
-#### Step 3: (Optional) Set Up Remote State
-
-```powershell
-# For team collaboration or production
-.\scripts\Setup-TerraformBackend.ps1
-
-# Creates:
-# - S3 bucket for state
-# - S3 bucket for logs
-# - DynamoDB table for locking
-# Cost: ~$0.50/month
-```
-
-#### Step 4: Deploy S3 Foundation
-
-```powershell
-# Dry run first (no changes)
-.\scripts\Deploy-Phase1.ps1 -DryRun
-
-# Review the plan, then deploy
-.\scripts\Deploy-Phase1.ps1
-
-# Expected duration: 2-5 minutes
-# Expected cost: ~$1/month
-```
-
-#### Step 5: Verify Deployment
-
-```powershell
-.\scripts\Verify-Phase1.ps1 -Detailed
-
-# Expected:
-# ✅ S3 Buckets: 3/3
-# ✅ KMS Keys: 1/1
-# ❌ CloudTrail: 0/2 (not deployed yet)
-# ❌ Config: 0/3 (not deployed yet)
-```
-
-### Detailed Deployment Steps
-
-#### 1. Configure terraform.tfvars
-
-```powershell
-cd terraform\environments\dev
-
-# Copy example file
-Copy-Item terraform.tfvars.example terraform.tfvars
-
-# Edit the file
-notepad terraform.tfvars
-```
-
-**terraform.tfvars:**
-
-```hcl
-# Required
-owner_email = "your.email@company.com"
-alert_email = "security-alerts@company.com"
-
-# Optional (defaults shown)
-aws_region = "eu-west-1"
-
-# Optional lifecycle customization
-cloudtrail_log_retention_days = 365  # 1 year
-config_log_retention_days     = 365  # 1 year
-access_log_retention_days     = 365  # 1 year
-transition_to_ia_days         = 90   # 3 months
-transition_to_glacier_days    = 180  # 6 months
-```
-
-#### 2. Initialize Terraform
-
-```powershell
+```bash
+# Full deployment from scratch
+cd terraform/environments/dev
 terraform init
-
-# Expected output:
-# Initializing modules...
-# Initializing the backend...
-# Initializing provider plugins...
-# Terraform has been successfully initialized!
-```
-
-#### 3. Plan Deployment
-
-```powershell
 terraform plan -out=tfplan
+time terraform apply tfplan  # Should complete in <60 seconds (AC3)
 
-# Review the plan:
-# Plan: 16 to add, 0 to change, 0 to destroy
-#
-# Resources to be created:
-# - 3 S3 buckets
-# - 3 bucket versioning configs
-# - 3 encryption configs
-# - 3 public access blocks
-# - 2 bucket logging configs
-# - 3 lifecycle configs
-# - 3 ownership controls
-# - 2 bucket policies
-# - 1 KMS key
-# - 1 KMS alias
-```
+# Full teardown
+terraform destroy -auto-approve
 
-#### 4. Apply Changes
-
-```powershell
-terraform apply tfplan
-
-# Monitor progress:
-# aws_kms_key.s3: Creating...
-# aws_kms_key.s3: Creation complete [10s]
-# aws_s3_bucket.logs: Creating...
-# aws_s3_bucket.logs: Creation complete [5s]
-# ...
-# Apply complete! Resources: 16 added, 0 changed, 0 destroyed.
-```
-
-#### 5. Save Outputs
-
-```powershell
-terraform output -json > ..\..\..\outputs.json
-
-# View outputs
-terraform output
-
-# Expected:
-# cloudtrail_bucket_name = "iam-security-dev-cloudtrail-826232761554"
-# config_bucket_name = "iam-security-dev-config-826232761554"
-# kms_key_id = "12345678-1234-1234-1234-123456789012"
+# Redeploy to test repeatability (AC6)
+terraform apply -auto-approve
 ```
 
 ---
 
-## ✅ Verification
+### PowerShell Automation Scripts
 
-### Automated Verification
+#### **Deploy-Phase1.ps1** (Week 3, Day 5)
 
 ```powershell
-# Run comprehensive checks
-.\scripts\Verify-Phase1.ps1 -Detailed -ExportReport
-
-# Categories checked:
-# 1. S3 Buckets (3 checks)
-# 2. KMS Keys (1 check)
-# 3. CloudTrail (2 checks) - Will fail until CloudTrail deployed
-# 4. AWS Config (3 checks) - Will fail until Config deployed
-# 5. IAM Access Analyzer (1 check) - Will fail until deployed
-# 6. Security Hub (2 checks) - Will fail until enabled
-# 7. EventBridge (1 check) - Will fail until rules created
-# 8. Terraform State (3 checks)
-
-# Expected current state:
-# Total: 16 checks
-# Passed: 5/16 (S3 + KMS + Terraform)
-# Failed: 11/16 (Services not deployed yet)
+# Automated deployment script
+# 1. Source AWS credentials (Set-AWSEnvironment.ps1)
+# 2. Terraform init/plan/apply
+# 3. Run acceptance tests
+# 4. Generate deployment report
 ```
 
-### Manual Verification
-
-#### Check S3 Buckets
+#### **Test-Phase1.ps1** (Week 4, Days 1-3)
 
 ```powershell
-# List buckets
-aws s3 ls | Select-String "iam-security-dev"
-
-# Expected:
-# iam-security-dev-cloudtrail-826232761554
-# iam-security-dev-config-826232761554
-# iam-security-dev-logs-826232761554
-
-# Check bucket encryption
-aws s3api get-bucket-encryption `
-  --bucket iam-security-dev-cloudtrail-826232761554
-
-# Expected: KMS encryption enabled
-
-# Check versioning
-aws s3api get-bucket-versioning `
-  --bucket iam-security-dev-cloudtrail-826232761554
-
-# Expected: Status: Enabled
-
-# Check public access block
-aws s3api get-public-access-block `
-  --bucket iam-security-dev-cloudtrail-826232761554
-
-# Expected: All 4 settings = true
+# Test scenario orchestration
+# 1. Create 5 IAM misconfigurations
+# 2. Wait for detection (max 5 minutes)
+# 3. Query Security Hub for findings
+# 4. Calculate MTTD
+# 5. Generate test report
 ```
 
-#### Check KMS Key
+#### **Cleanup-Phase1.ps1** (Week 4, Day 4)
 
 ```powershell
-# List keys
-aws kms list-keys
-
-# Describe key
-aws kms describe-key --key-id <key-id>
-
-# Expected:
-# KeyState: Enabled
-# KeyManager: CUSTOMER
-
-# Check rotation
-aws kms get-key-rotation-status --key-id <key-id>
-
-# Expected: KeyRotationEnabled: true
+# Clean teardown
+# 1. Terraform destroy
+# 2. Verify all resources deleted
+# 3. Check for orphaned resources (manual cleanup if needed)
 ```
 
-#### Check Costs (After 24 Hours)
+---
 
-```powershell
-# Get cost estimate
-aws ce get-cost-and-usage `
-  --time-period Start=2025-01-01,End=2025-01-31 `
-  --granularity MONTHLY `
-  --metrics BlendedCost `
-  --filter file://filter.json
+## Testing Strategy
 
-# filter.json:
-{
-  "Tags": {
-    "Key": "Project",
-    "Values": ["IAM-Secure-Gate"]
+### Prerequisites for Testing
+
+Before executing test scenarios, ensure your AWS CLI is configured for the correct region:
+
+**Option 1: Set Default Region (Recommended)**
+
+```bash
+# Configure AWS CLI to default to eu-west-1
+aws configure set region eu-west-1
+
+# Verify configuration
+aws configure get region
+# Should output: eu-west-1
+```
+
+**Option 2: Use --region Flag**
+
+```bash
+# Add --region eu-west-1 to every AWS CLI command
+aws iam create-user --user-name test-user --region eu-west-1
+```
+
+**Important Notes:**
+
+- IAM commands work globally regardless of region setting, but other services (Config, Security Hub, Access Analyzer) are regional
+- All test commands below assume your default region is set to `eu-west-1`
+- If using PowerShell scripts, they should automatically use eu-west-1 via AWS credential configuration
+
+---
+
+### Test Scenarios (5 Required for AC1)
+
+#### **Scenario 1: Root Account Access Key Creation**
+
+**Violation Type:** Critical - Root credential exposure  
+**Detection Method:** Config rule `iam-root-access-key-check`
+
+**Test Steps:**
+
+```bash
+# 1. Attempt to create root access key (will fail in real environment, simulate in test account)
+aws iam create-access-key --user-name root
+
+# 2. Expected Detection Time: 1-5 minutes (Config evaluation period)
+
+# 3. Verify Security Hub Finding:
+aws securityhub get-findings \
+  --filters '{
+    "ProductName": [{"Value": "Config", "Comparison": "EQUALS"}],
+    "ComplianceStatus": [{"Value": "FAILED", "Comparison": "EQUALS"}],
+    "Title": [{"Value": "iam-root-access-key-check", "Comparison": "PREFIX"}]
+  }'
+
+# 4. Expected Result:
+# - Finding with Severity: CRITICAL
+# - Recommendation: "Remove root access keys"
+```
+
+**Success Criteria:**
+
+- Finding appears in Security Hub within 5 minutes
+- Severity correctly set to CRITICAL
+- CloudWatch dashboard "Config Compliance" widget shows non-compliant resource
+
+---
+
+#### **Scenario 2: IAM User Without MFA**
+
+**Violation Type:** High - Weak authentication  
+**Detection Method:** Config rule `iam-user-mfa-enabled`
+
+**Test Steps:**
+
+```bash
+# 1. Create IAM user with console access but no MFA
+aws iam create-user --user-name test-no-mfa-user
+aws iam create-login-profile \
+  --user-name test-no-mfa-user \
+  --password 'TempPassword123!' \
+  --password-reset-required
+
+# 2. Expected Detection Time: 1-5 minutes
+
+# 3. Verify Finding:
+aws securityhub get-findings \
+  --filters '{
+    "ResourceId": [{"Value": "test-no-mfa-user", "Comparison": "PREFIX"}],
+    "ComplianceStatus": [{"Value": "FAILED", "Comparison": "EQUALS"}]
+  }'
+
+# 4. Cleanup:
+aws iam delete-login-profile --user-name test-no-mfa-user
+aws iam delete-user --user-name test-no-mfa-user
+```
+
+**Success Criteria:**
+
+- Detection latency <5 minutes
+- Finding includes resource ID (username)
+- Remediation recommendation provided
+
+---
+
+#### **Scenario 3: AdministratorAccess Policy Attachment**
+
+**Violation Type:** High - Excessive permissions  
+**Detection Method:** Config rule `iam-policy-no-statements-with-admin-access`
+
+**Test Steps:**
+
+```bash
+# 1. Create test user and attach admin policy
+aws iam create-user --user-name test-admin-user
+aws iam attach-user-policy \
+  --user-name test-admin-user \
+  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+
+# 2. Verify EventBridge captures the API call immediately
+aws logs tail /aws/events/iam-policy-changes --since 1m
+
+# 3. Wait for Config evaluation (1-5 minutes)
+
+# 4. Verify Security Hub Finding:
+aws securityhub get-findings \
+  --filters '{
+    "ResourceId": [{"Value": "test-admin-user", "Comparison": "PREFIX"}],
+    "Title": [{"Value": "Administrator access", "Comparison": "PREFIX"}]
+  }'
+
+# 5. Calculate MTTD:
+# MTTD = (Security Hub Finding CreatedAt) - (CloudTrail Event Time)
+
+# 6. Cleanup:
+aws iam detach-user-policy \
+  --user-name test-admin-user \
+  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+aws iam delete-user --user-name test-admin-user
+```
+
+**Success Criteria:**
+
+- EventBridge logs API call within 1 second
+- Security Hub finding within 5 minutes
+- MTTD calculation documented in test report
+
+---
+
+#### **Scenario 4: External IAM Role Trust Relationship**
+
+**Violation Type:** Medium - Potential lateral movement  
+**Detection Method:** IAM Access Analyzer
+
+**Test Steps:**
+
+```bash
+# 1. Create IAM role with external AWS account trust
+aws iam create-role \
+  --role-name test-external-trust-role \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+# 2. Expected Detection Time: 1-30 minutes (Access Analyzer analysis period)
+
+# 3. Verify Access Analyzer Finding:
+aws accessanalyzer list-findings \
+  --analyzer-arn arn:aws:access-analyzer:eu-west-1:YOUR_ACCOUNT_ID:analyzer/iam-secure-gate-analyzer \
+  --filter '{"resource": {"contains": ["test-external-trust-role"]}}'
+
+# 4. Verify Security Hub Ingestion:
+aws securityhub get-findings \
+  --filters '{
+    "ProductName": [{"Value": "IAM Access Analyzer", "Comparison": "EQUALS"}],
+    "ResourceId": [{"Value": "test-external-trust-role", "Comparison": "PREFIX"}]
+  }'
+
+# 5. Cleanup:
+aws iam delete-role --role-name test-external-trust-role
+```
+
+**Success Criteria:**
+
+- Access Analyzer detects external access grant
+- Finding severity: MEDIUM or HIGH
+- Security Hub displays finding with "External Access" category
+
+---
+
+#### **Scenario 5: Root Account Console Login**
+
+**Violation Type:** Critical - Violation of least privilege  
+**Detection Method:** EventBridge rule for Root activity + CIS Benchmark control
+
+**Test Steps:**
+
+```bash
+# 1. Simulate root login (use CloudTrail event injection if real root login not feasible)
+# Alternative: Review existing CloudTrail logs for any root activity
+
+# 2. Verify EventBridge Rule Trigger:
+aws logs filter-log-events \
+  --log-group-name /aws/events/root-account-activity \
+  --filter-pattern "Root" \
+  --start-time $(date -u -d '5 minutes ago' +%s)000
+
+# 3. Verify Security Hub CIS Control:
+aws securityhub get-findings \
+  --filters '{
+    "GeneratorId": [{"Value": "cis-aws-foundations-benchmark/v/1.2.0/1.1", "Comparison": "PREFIX"}]
+  }'
+
+# 4. Expected Results:
+# - EventBridge logs root activity within seconds
+# - Security Hub CIS finding with Severity: CRITICAL
+# - Dashboard widget "Security Hub Findings by Severity" shows CRITICAL alert
+```
+
+**Success Criteria:**
+
+- Real-time detection (<1 minute) via EventBridge
+- CIS Benchmark control flagged in Security Hub
+- CloudWatch dashboard updates with critical finding
+
+---
+
+### Test Execution Plan (Week 4, Days 1-3)
+
+**Day 1: Infrastructure Validation**
+
+- Deploy Phase 1 from scratch (repeatability test)
+- Verify all 7 modules deployed successfully
+- Check CloudWatch dashboard displays baseline (no findings yet)
+
+**Day 2: Violation Injection**
+
+- Execute 5 test scenarios sequentially (15-minute spacing)
+- Monitor CloudWatch Logs for EventBridge triggers
+- Record timestamps for MTTD calculation
+
+**Day 3: Finding Analysis**
+
+- Query Security Hub for all findings
+- Calculate MTTD for each scenario
+- Generate test report with pass/fail criteria
+- Screenshot dashboard showing findings
+
+**Test Report Template:**
+
+```markdown
+# Phase 1 Test Report
+
+## Test Execution Summary
+
+- Date: [Date]
+- Duration: 3 hours
+- Scenarios Executed: 5
+- Pass Rate: X/5 (XX%)
+
+## MTTD Analysis
+
+| Scenario        | IAM API Call Time | Security Hub Finding Time | MTTD  | Target | Pass/Fail |
+| --------------- | ----------------- | ------------------------- | ----- | ------ | --------- |
+| Root Access Key | HH:MM:SS          | HH:MM:SS                  | X min | <5 min | ✅/❌     |
+| User No MFA     | HH:MM:SS          | HH:MM:SS                  | X min | <5 min | ✅/❌     |
+| Admin Policy    | HH:MM:SS          | HH:MM:SS                  | X min | <5 min | ✅/❌     |
+| External Trust  | HH:MM:SS          | HH:MM:SS                  | X min | <5 min | ✅/❌     |
+| Root Login      | HH:MM:SS          | HH:MM:SS                  | X min | <5 min | ✅/❌     |
+
+**Average MTTD:** X.X minutes
+
+## Findings Analysis
+
+[Screenshot of Security Hub findings]
+[Screenshot of CloudWatch dashboard]
+
+## Issues Identified
+
+- [Any false positives]
+- [Any missed detections]
+- [Performance bottlenecks]
+
+## Recommendations for Phase 2
+
+- [Findings that should be auto-remediated]
+- [Findings that require human approval]
+```
+
+---
+
+## Cost Analysis
+
+### Monthly Cost Breakdown (Phase 1)
+
+| **Service**             | **Resource**                | **Quantity** | **Unit Cost**   | **Monthly Cost** | **Notes**                 |
+| ----------------------- | --------------------------- | ------------ | --------------- | ---------------- | ------------------------- |
+| **KMS**                 | Customer-managed key        | 1            | $1.00/key       | $1.00            | Includes key rotation     |
+| **S3**                  | CloudTrail logs (Standard)  | ~10 GB       | $0.023/GB       | $0.23            | 30-day hot storage        |
+| **S3**                  | CloudTrail logs (Glacier)   | ~20 GB       | $0.004/GB       | $0.08            | 31-90 day archive         |
+| **S3**                  | Config snapshots (Standard) | ~5 GB        | $0.023/GB       | $0.12            | 90-day hot storage        |
+| **S3**                  | Config snapshots (Glacier)  | ~40 GB       | $0.004/GB       | $0.16            | 91-365 day archive        |
+| **CloudTrail**          | Multi-region trail          | 1            | $0.00           | $0.00            | First trail free          |
+| **AWS Config**          | Configuration recorder      | 1            | $0.00           | $0.00            | Included with rules       |
+| **AWS Config**          | Config rules                | 3            | $2.00/rule      | $6.00            | ⚠️ Largest cost           |
+| **IAM Access Analyzer** | Account analyzer            | 1            | $0.00           | $0.00            | No charge                 |
+| **Security Hub**        | Findings ingestion          | ~100/day     | $0.0010/finding | $3.00            | After free tier           |
+| **EventBridge**         | Rule evaluations            | ~1M/month    | $0.00           | $0.00            | First 1M free             |
+| **CloudWatch**          | Dashboard                   | 1            | $3.00/dashboard | $3.00            | Custom dashboards         |
+| **CloudWatch**          | Log storage                 | ~2 GB        | $0.50/GB        | $1.00            | EventBridge targets       |
+| **Data Transfer**       | S3 → Services               | ~5 GB        | $0.00           | $0.00            | Same-region transfer free |
+|                         |                             |              | **Total**       | **$14.59/month** | ⚠️ Exceeds $5 target      |
+
+### Cost Optimization Strategies
+
+#### **Option A: Reduce Config Rules (Recommended)**
+
+- **Action:** Deploy only 2 rules instead of 3
+- **Savings:** $2.00/month
+- **New Total:** $12.59/month
+- **Trade-off:** Reduced detection coverage (remove `iam-policy-no-admin-access`)
+
+#### **Option B: Disable Security Hub (Not Recommended)**
+
+- **Action:** Remove Security Hub module
+- **Savings:** $3.00/month
+- **New Total:** $11.59/month
+- **Trade-off:** Lose centralized findings aggregation (breaks AC4)
+
+#### **Option C: Remove CloudWatch Dashboard**
+
+- **Action:** Use AWS Console native dashboards instead
+- **Savings:** $3.00/month
+- **New Total:** $11.59/month
+- **Trade-off:** Manual dashboard access, no custom widgets
+
+#### **Option D: Aggressive S3 Lifecycle (Recommended)**
+
+- **Action:** Reduce CloudTrail retention to 30 days (delete after), Config to 180 days
+- **Savings:** $0.24/month (minimal)
+- **New Total:** $14.35/month
+- **Trade-off:** Shorter audit trail (still meets most compliance requirements)
+
+#### **✅ Recommended Combination: A + D**
+
+- Deploy 2 Config rules + Aggressive S3 lifecycle
+- **Final Cost:** $12.35/month
+- **Exceeds Budget By:** $7.35/month
+
+**Budget Reality Check:**
+Given the scope of Phase 1, **$5/month is not realistic** if you want:
+
+- ✅ AWS Config rules (mandatory for AC1)
+- ✅ Security Hub (mandatory for AC4)
+- ✅ CloudWatch Dashboard (mandatory for AC5)
+
+**Recommended Budget:** $12-15/month for Phase 1  
+**Alternative:** Request AWS Educate credits from university (typically $100-200 for students)
+
+---
+
+## Risks & Mitigations
+
+### Technical Risks
+
+#### **Risk 1: AWS Config Rule Evaluation Latency**
+
+**Description:** Config rules evaluate every 1-24 hours (configurable), which may exceed <5 minute MTTD target.
+
+**Likelihood:** High  
+**Impact:** High (blocks AC2)
+
+**Mitigation:**
+
+- Configure Config rules for "Configuration changes" trigger (near real-time)
+- Use EventBridge as primary detection method (sub-second latency)
+- Config serves as backup detection layer and compliance record
+
+**Contingency:**
+
+- If Config latency consistently exceeds 5 minutes, rely on EventBridge for MTTD measurement
+- Use Config findings for compliance reporting only
+
+---
+
+#### **Risk 2: IAM Access Analyzer Analysis Delay**
+
+**Description:** Access Analyzer can take 1-30 minutes to analyze new resources.
+
+**Likelihood:** Medium  
+**Impact:** Medium (affects AC2 for Scenario 4)
+
+**Mitigation:**
+
+- Document expected latency range in test report
+- Use Access Analyzer for external access patterns, not real-time alerting
+- EventBridge + CloudTrail provide immediate detection of trust policy changes
+
+**Contingency:**
+
+- If Access Analyzer consistently >30 minutes, escalate to AWS Support
+- Consider custom Lambda function to parse CloudTrail for external principals
+
+---
+
+#### **Risk 3: Terraform State File Corruption**
+
+**Description:** Local state file could be corrupted during apply/destroy, causing deployment failures.
+
+**Likelihood:** Low  
+**Impact:** High (blocks AC6)
+
+**Mitigation:**
+
+- Enable S3 versioning on all buckets (state snapshots)
+- Pre-commit hook to backup state file before each apply
+- Keep manual backup of last-known-good state in `terraform/backups/`
+
+**Contingency:**
+
+- Restore from backup state file
+- If state unrecoverable, use `terraform import` to rebuild state from existing resources
+- Worst case: Destroy all resources via AWS Console, redeploy from scratch
+
+---
+
+#### **Risk 4: CloudTrail Log Delivery Delay**
+
+**Description:** CloudTrail typically delivers logs within 5-15 minutes, not real-time.
+
+**Likelihood:** Certain  
+**Impact:** Medium (affects MTTD measurement)
+
+**Mitigation:**
+
+- Use EventBridge for real-time event capture (CloudTrail events are available immediately via EventBridge)
+- CloudTrail S3 logs are for audit trail, not primary detection
+
+**Contingency:**
+
+- If EventBridge unavailable, accept higher MTTD (15 minutes) and document in limitations
+
+---
+
+#### **Risk 5: Security Hub Finding Ingestion Failure**
+
+**Description:** Security Hub may fail to ingest findings from Config/Access Analyzer due to integration issues.
+
+**Likelihood:** Low  
+**Impact:** High (blocks AC4)
+
+**Mitigation:**
+
+- Enable Security Hub integrations explicitly in Terraform:
+  ```hcl
+  resource "aws_securityhub_product_subscription" "config" {
+    product_arn = "arn:aws:securityhub:eu-west-1::product/aws/config"
   }
-}
+  ```
+- Test finding ingestion during module development, not just at the end
 
-# Expected: $1-2 for first month
-```
+**Contingency:**
 
-### Security Verification
-
-```powershell
-# Run AWS Trusted Advisor (if you have Business/Enterprise support)
-aws support describe-trusted-advisor-checks
-
-# Check Security Hub findings (after enabling Security Hub)
-aws securityhub get-findings `
-  --filters '{"ResourceType": [{"Value": "AwsS3Bucket", "Comparison": "EQUALS"}]}'
-
-# Expected: 0 findings for S3 buckets (all secure)
-```
+- Manually enable integrations in AWS Console if Terraform fails
+- Create custom EventBridge rule to route Config/Analyzer findings directly to CloudWatch
 
 ---
 
-## 🐛 Troubleshooting
+### Project Management Risks
 
-### Common Issues
+#### **Risk 6: Scope Creep (Phase 2 Features Bleeding into Phase 1)**
 
-#### Issue 1: "AccessDenied" Error During Deployment
+**Description:** Temptation to add remediation logic or advanced features during Phase 1 development.
 
-**Symptom:**
+**Likelihood:** Medium  
+**Impact:** High (delays Phase 1 completion)
 
-```
-Error: error creating S3 bucket: AccessDenied
-```
+**Mitigation:**
 
-**Cause:** IAM user lacks necessary permissions
+- Strict adherence to Phase 1 acceptance criteria (detection only, no remediation)
+- Code review checklist: "Does this code belong in Phase 2?"
+- Use Git branches: `phase-1-detection` (current), `phase-2-remediation` (future)
 
-**Solution:**
+**Contingency:**
 
-```powershell
-# Check current permissions
-aws iam get-user-policy --user-name terraform-admin --policy-name TerraformPolicy
-
-# Ensure policy includes:
-# - s3:CreateBucket
-# - s3:PutBucketPolicy
-# - s3:PutBucketVersioning
-# - kms:CreateKey
-# - kms:CreateAlias
-```
-
-#### Issue 2: "BucketAlreadyExists" Error
-
-**Symptom:**
-
-```
-Error: error creating S3 bucket: BucketAlreadyExists
-```
-
-**Cause:** Bucket name collision (account ID should prevent this)
-
-**Solution:**
-
-```powershell
-# Check if bucket exists
-aws s3 ls | Select-String "iam-security"
-
-# If exists from previous deployment, import it:
-terraform import aws_s3_bucket.cloudtrail iam-security-dev-cloudtrail-826232761554
-
-# Or delete and recreate:
-aws s3 rb s3://iam-security-dev-cloudtrail-826232761554 --force
-```
-
-#### Issue 3: "State Lock" Error
-
-**Symptom:**
-
-```
-Error: Error acquiring the state lock
-Lock Info:
-  ID:        12345678-1234-1234-1234-123456789012
-  Path:      iam-security-terraform-state/dev/terraform.tfstate
-```
-
-**Cause:** Previous `terraform apply` didn't complete properly
-
-**Solution:**
-
-```powershell
-# Force unlock (use the Lock ID from error)
-terraform force-unlock 12345678-1234-1234-1234-123456789012
-
-# Verify no other processes running
-Get-Process | Select-String "terraform"
-```
-
-#### Issue 4: High KMS Costs
-
-**Symptom:** KMS costs higher than expected ($1+/month)
-
-**Cause:** Too many encryption/decryption API calls
-
-**Solution:**
-
-- Bucket keys are enabled (reduces API calls by 99%)
-- Check CloudTrail for excessive S3 operations:
-
-```powershell
-aws cloudtrail lookup-events `
-  --lookup-attributes AttributeKey=EventName,AttributeValue=Encrypt
-
-# If excessive calls, review application S3 usage
-```
-
-#### Issue 5: Cannot Delete Bucket (NotEmpty)
-
-**Symptom:**
-
-```
-Error: error deleting S3 bucket: BucketNotEmpty
-```
-
-**Cause:** Bucket contains objects or versions
-
-**Solution:**
-
-```powershell
-# Empty bucket (including versions)
-aws s3 rm s3://bucket-name --recursive
-
-# Delete all versions
-aws s3api list-object-versions `
-  --bucket bucket-name | ConvertFrom-Json | ForEach-Object {
-    $_.Versions | ForEach-Object {
-        aws s3api delete-object `
-          --bucket bucket-name `
-          --key $_.Key `
-          --version-id $_.VersionId
-    }
-}
-
-# Then try terraform destroy again
-terraform destroy
-```
-
-### Getting Help
-
-1. **Check Terraform Logs:**
-
-   ```powershell
-   $env:TF_LOG="DEBUG"
-   terraform apply
-   ```
-
-2. **Check AWS CloudTrail:**
-
-   ```powershell
-   aws cloudtrail lookup-events --max-results 50
-   ```
-
-3. **Validation Commands:**
-
-   ```powershell
-   terraform fmt -check
-   terraform validate
-   terraform plan
-   ```
-
-4. **Contact Support:**
-   - GitHub Issues: `https://github.com/yourusername/IAM-Secure-Gate/issues`
-   - Email: your.email@company.com
+- If already implemented Phase 2 code, move to separate module and comment out in root `main.tf`
 
 ---
 
-## 📊 Success Metrics
+#### **Risk 7: Time Underestimation for CloudWatch Dashboard**
 
-### Deployment Metrics
+**Description:** Dashboard JSON body is complex and time-consuming to debug.
 
-| Metric                  | Target       | Measurement                               |
-| ----------------------- | ------------ | ----------------------------------------- |
-| Deployment Time         | <10 minutes  | Time from `terraform apply` to completion |
-| First-time Success Rate | >95%         | Deployments succeeding without errors     |
-| Resource Creation       | 16 resources | Count in `terraform plan`                 |
-| Cost                    | <$2/month    | AWS Cost Explorer after 7 days            |
+**Likelihood:** High  
+**Impact:** Low (dashboard is P1, not P0)
 
-### Security Metrics
+**Mitigation:**
 
-| Metric              | Target | Measurement                |
-| ------------------- | ------ | -------------------------- |
-| Public Buckets      | 0      | AWS Trusted Advisor        |
-| Unencrypted Buckets | 0      | Security Hub findings      |
-| Versioning Enabled  | 100%   | `Verify-Phase1.ps1`        |
-| HTTPS Enforcement   | 100%   | Bucket policy audit        |
-| Access Logging      | 100%   | Bucket configuration check |
+- Build dashboard widgets incrementally (1 widget per hour)
+- Use AWS Console to prototype widget, then export JSON
+- Accept simplified dashboard if time-constrained (2 widgets instead of 4)
 
-### Operational Metrics
+**Contingency:**
 
-| Metric                 | Target                 | Measurement                |
-| ---------------------- | ---------------------- | -------------------------- |
-| Verification Pass Rate | 100% (5/5 for S3 only) | `Verify-Phase1.ps1` output |
-| False Positive Rate    | <1%                    | Manual review of findings  |
-| Mean Time to Deploy    | <5 minutes             | Deployment script logs     |
-| Mean Time to Verify    | <2 minutes             | Verification script logs   |
+- Remove dashboard from Phase 1 MVP (defer to Phase 4)
+- Use AWS CloudWatch Insights queries manually for demos
 
 ---
 
-## 🎯 Next Steps
+## Success Metrics
 
-### Phase 1 Completion
+### Phase 1 Completion Checklist
 
-After S3 foundation is deployed, complete Phase 1 by building:
+#### **Infrastructure (AC3, AC6)**
 
-1. **CloudTrail Module** (Week 2)
+- [ ] All 7 Terraform modules deployed successfully
+- [ ] Zero manual steps required for deployment
+- [ ] Deployment time <60 seconds (measured with `time terraform apply`)
+- [ ] Clean teardown and redeploy successful (3 cycles)
+- [ ] No orphaned resources after `terraform destroy`
 
-   - Enable multi-region trail
-   - Configure log delivery to S3
-   - Set up CloudWatch Logs integration
-   - Estimated time: 2-4 hours
+#### **Detection (AC1, AC2)**
 
-2. **AWS Config Module** (Week 2)
+- [ ] 5 distinct IAM misconfiguration types detected
+- [ ] Average MTTD <5 minutes across all scenarios
+- [ ] Security Hub displays findings from all sources (Config, Access Analyzer, EventBridge)
+- [ ] CloudWatch dashboard shows real-time updates
 
-   - Configure recorder for IAM resources
-   - Deploy 5 IAM-focused Config Rules
-   - Set up remediation actions
-   - Estimated time: 3-5 hours
+#### **Integration (AC4)**
 
-3. **IAM Access Analyzer Module** (Week 3)
+- [ ] CloudTrail logs visible in S3 bucket
+- [ ] Config rules evaluating resources (compliance status displayed)
+- [ ] IAM Access Analyzer generating findings for external access
+- [ ] Security Hub ingesting findings from all 3 sources (100% integration)
+- [ ] EventBridge rules triggering CloudWatch Logs
 
-   - Create ACCOUNT analyzer
-   - Configure finding delivery to Security Hub
-   - Set up alerts for external access
-   - Estimated time: 1-2 hours
+#### **Documentation (Deliverable)**
 
-4. **Security Hub Integration** (Week 3)
+- [ ] Architecture diagram (completed)
+- [ ] Module README files (7 modules)
+- [ ] Deployment guide (step-by-step instructions)
+- [ ] Test report (5 scenarios with MTTD calculations)
+- [ ] Cost analysis (actual spend vs. projected)
 
-   - Enable Security Hub
-   - Subscribe to CIS Benchmark
-   - Configure finding aggregation
-   - Create custom insights
-   - Estimated time: 2-3 hours
+#### **Code Quality**
 
-5. **EventBridge Rules** (Week 4)
-
-   - Create IAM event filters
-   - Configure SNS notifications
-   - Set up CloudWatch Logs targets
-   - Estimated time: 2-3 hours
-
-6. **CloudWatch Dashboard** (Week 4)
-   - Create metrics dashboard
-   - Configure alarms
-   - Set up anomaly detection
-   - Estimated time: 2-3 hours
-
-### Phase 2: Remediation (Weeks 5-8)
-
-1. Lambda function: PolicyRemediator
-2. Lambda function: TrustPolicyRemediator
-3. EventBridge routing by severity
-4. SNS approval workflow
-5. DynamoDB remediation history
-
-### Phase 3: IaC Security Gate (Weeks 9-12)
-
-1. GitHub Actions workflow
-2. Checkov integration
-3. OPA/Conftest policies
-4. SARIF output
-5. PR blocking on violations
+- [ ] No hardcoded credentials or sensitive data in code
+- [ ] All resources tagged with `phase_1_tags`
+- [ ] Terraform code passes `terraform validate`
+- [ ] Terraform code formatted with `terraform fmt`
+- [ ] `.gitignore` excludes state files, credentials, logs
 
 ---
 
-## 📚 Additional Resources
+### Deliverables Checklist
 
-### Documentation
-
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [AWS CloudTrail User Guide](https://docs.aws.amazon.com/cloudtrail/)
-- [AWS Config Developer Guide](https://docs.aws.amazon.com/config/)
-- [AWS Security Hub User Guide](https://docs.aws.amazon.com/securityhub/)
-- [IAM Access Analyzer Guide](https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer.html)
-
-### Best Practices
-
-- [CIS AWS Foundations Benchmark](https://www.cisecurity.org/benchmark/amazon_web_services)
-- [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)
-- [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
-
-### Community
-
-- [Terraform AWS Modules](https://github.com/terraform-aws-modules)
-- [AWS Security Blog](https://aws.amazon.com/blogs/security/)
-- [r/aws on Reddit](https://reddit.com/r/aws)
-- [Stack Overflow: AWS](https://stackoverflow.com/questions/tagged/amazon-web-services)
+| **Deliverable**          | **Format**         | **Location**                  | **Due Date** | **Status**     |
+| ------------------------ | ------------------ | ----------------------------- | ------------ | -------------- |
+| **Terraform Modules**    | `.tf` files        | `terraform/modules/`          | Week 3       | 🟡 In Progress |
+| **Root Module**          | `main.tf`          | `terraform/environments/dev/` | Week 3       | 🟡 In Progress |
+| **Architecture Diagram** | `.png` / `.drawio` | `docs/architecture/`          | Week 2       | ⬜ Not Started |
+| **Module READMEs**       | `.md` files        | Each module directory         | Week 3       | ⬜ Not Started |
+| **Deployment Guide**     | `.md` file         | `docs/deployment/`            | Week 4       | ⬜ Not Started |
+| **Test Scenarios**       | PowerShell script  | `scripts/Test-Phase1.ps1`     | Week 4       | ⬜ Not Started |
+| **Test Report**          | `.md` file         | `docs/testing/`               | Week 4       | ⬜ Not Started |
+| **Cost Analysis**        | `.xlsx` / `.md`    | `docs/cost-analysis/`         | Week 4       | ⬜ Not Started |
+| **CloudWatch Dashboard** | JSON export        | `config/dashboards/`          | Week 3       | ⬜ Not Started |
 
 ---
 
-## 📝 Changelog
+## Next Steps
 
-### v0.1.0 - Phase 1 Foundation (2025-01-20)
+### Week 1 Priorities (Foundation + Core Detection)
 
-**Added:**
+1. **Finalize Critical Decisions:**
 
-- S3 module with KMS encryption
-- 3-tier bucket architecture (CloudTrail, Config, Logs)
-- Lifecycle policies for cost optimization
-- Comprehensive deployment scripts
-- Automated verification suite
-- Detection testing framework
-- Terraform backend configuration
+   - Confirm budget tolerance ($12-15/month vs. $5/month)
+   - AWS region: `eu-west-1` (Ireland - your home region)
+   - Approve 3-rule Config setup (vs. 5-rule original plan)
 
-**Security:**
+2. **Build Foundation Module:**
 
-- KMS customer-managed keys with rotation
-- HTTPS-only enforcement
-- Public access blocked (4 controls)
-- Access logging enabled
-- Bucket ownership controls
+   - KMS key with rotation
+   - 2 S3 buckets (CloudTrail, Config)
+   - Bucket policies and encryption
+   - Test: Verify bucket encryption and versioning
 
-**Documentation:**
+3. **Build CloudTrail Module:**
 
-- Complete README for Phase 1
-- S3 module documentation
-- Implementation guides
-- Troubleshooting section
+   - Multi-region trail configuration
+   - S3 integration with foundation module
+   - Test: Create IAM user, verify logged in S3
+
+4. **Build AWS Config Module:**
+   - Configuration recorder + delivery channel
+   - 3 IAM rules deployment
+   - Test: Create non-compliant resource, verify Config detects
+
+### Week 2 Priorities (Integration + Aggregation)
+
+1. **Build IAM Access Analyzer Module:**
+
+   - ACCOUNT-type analyzer
+   - Test: Create external trust role, verify finding
+
+2. **Build Security Hub Module:**
+
+   - Enable Foundational + CIS standards
+   - Integrate Config and Access Analyzer
+   - Test: Verify findings from all sources appear
+
+3. **Build EventBridge Module:**
+   - 3 rule patterns (policy changes, trust changes, root activity)
+   - CloudWatch Logs targets
+   - Test: Attach policy, verify EventBridge logs
+
+### Week 3 Priorities (Dashboard + Root Integration)
+
+1. **Build CloudWatch Dashboard Module:**
+
+   - 4 widgets (IAM API calls, Security Hub findings, Config compliance, Access Analyzer)
+   - Test: Verify all widgets displaying data
+
+2. **Root Module Integration:**
+
+   - Wire all 7 modules together
+   - Dependency management
+   - Test: Full deployment <60 seconds
+
+3. **Documentation:**
+   - Architecture diagram
+   - Module READMEs
+   - Deployment guide
+
+### Week 4 Priorities (Testing + Validation)
+
+1. **Test Execution:**
+
+   - Run 5 violation scenarios
+   - Calculate MTTD for each
+   - Generate test report with screenshots
+
+2. **Repeatability Testing:**
+
+   - 3 cycles of deploy → test → destroy
+   - Verify AC6 (clean teardown)
+
+3. **Final Documentation:**
+   - Cost analysis (actual vs. projected)
+   - Lessons learned
+   - Phase 2 recommendations
 
 ---
 
-## 📄 License
+## Questions for Supervisor
 
-This project is part of a Final Year Cloud Security Project.
+1. **Budget Approval:**
 
-**Author:** Roko Skugor  
-**Institution:** TUD
-**Year:** 2025-2026  
-**Project:** IAM-Secure-Gate - Intelligent IAM Misconfiguration Auditor
+   - Phase 1 realistic cost is $12-15/month (not $5/month as initially estimated)
+   - Can we adjust budget or request AWS Educate credits?
+
+2. **Config Rules Trade-off:**
+
+   - Should we deploy 2 rules (budget-friendly) or 3 rules (better coverage)?
+   - If 3 rules, accept $7/month over-budget?
+
+3. **Dashboard Priority:**
+
+   - Is CloudWatch dashboard mandatory for Phase 1 MVP (adds $3/month)?
+   - Alternative: Use AWS Console native views for demo?
+
+4. **Test Scenario 4 (Old Access Keys):**
+
+   - Access key rotation rule requires 90-day wait to trigger
+   - Should we replace with different test scenario, or accept as "manual validation only"?
+
+5. **Multi-Region Consideration:**
+   - Phase 1 is single-region (eu-west-1 Ireland)
+   - Should Phase 4/5 add multi-region support, or is single-region acceptable for FYP?
+
+---
+
+## References
+
+1. [AWS CloudTrail Documentation](https://docs.aws.amazon.com/cloudtrail/)
+2. [AWS Config Developer Guide](https://docs.aws.amazon.com/config/)
+3. [IAM Access Analyzer Documentation](https://docs.aws.amazon.com/access-analyzer/)
+4. [AWS Security Hub User Guide](https://docs.aws.amazon.com/securityhub/)
+5. CIS AWS Foundations Benchmark v1.2.0
+6. [Terraform AWS Provider Documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+
+---
+
+**Document Version:** 1.0  
+**Last Updated:** December 2025  
+**Status:** Planning Complete → Ready for Implementation
