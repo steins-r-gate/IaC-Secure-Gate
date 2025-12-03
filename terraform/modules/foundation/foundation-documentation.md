@@ -3,7 +3,7 @@
 **Module:** `terraform/modules/foundation`  
 **Purpose:** Encryption and storage infrastructure for Phase 1 AWS detection baseline  
 **Version:** 1.0  
-**Last Updated:** December 2, 2024
+**Last Updated:** December 2, 2025
 
 ---
 
@@ -2020,7 +2020,7 @@ arn:aws:s3:::iam-secure-gate-dev-config-826232761554
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** December 2, 2024  
+**Last Updated:** December 2, 2025  
 **Status:** Production-Ready ✅  
 **Module Version:** foundation-v1.0
 
