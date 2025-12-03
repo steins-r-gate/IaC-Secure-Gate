@@ -7,7 +7,7 @@
 locals {
   cloudtrail_bucket_name = "${var.project_name}-${var.environment}-cloudtrail-${var.account_id}"
   config_bucket_name     = "${var.project_name}-${var.environment}-config-${var.account_id}"
-  
+
   # Common tags for all foundation resources
   foundation_tags = merge(var.common_tags, {
     Module = "foundation"
@@ -137,6 +137,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
     id     = "cloudtrail-log-retention"
     status = "Enabled"
 
+    # Apply to all objects in bucket
+    filter {}
+
     # Move to Glacier after 30 days
     transition {
       days          = 30
@@ -181,10 +184,10 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
         }
       },
       {
-        Sid    = "DenyInsecureTransport"
-        Effect = "Deny"
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
         Principal = "*"
-        Action = "s3:*"
+        Action    = "s3:*"
         Resource = [
           aws_s3_bucket.cloudtrail.arn,
           "${aws_s3_bucket.cloudtrail.arn}/*"
@@ -252,6 +255,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "config" {
     id     = "config-snapshot-retention"
     status = "Enabled"
 
+    # Apply to all objects in bucket
+    filter {}
+
     # Move to Glacier after 90 days
     transition {
       days          = 90
@@ -305,10 +311,10 @@ resource "aws_s3_bucket_policy" "config" {
         }
       },
       {
-        Sid    = "DenyInsecureTransport"
-        Effect = "Deny"
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
         Principal = "*"
-        Action = "s3:*"
+        Action    = "s3:*"
         Resource = [
           aws_s3_bucket.config.arn,
           "${aws_s3_bucket.config.arn}/*"
