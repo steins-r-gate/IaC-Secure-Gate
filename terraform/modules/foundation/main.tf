@@ -129,6 +129,15 @@ resource "aws_s3_bucket_public_access_block" "cloudtrail" {
   restrict_public_buckets = true
 }
 
+# CloudTrail bucket ownership controls (NEW - ADD THIS)
+resource "aws_s3_bucket_ownership_controls" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 # CloudTrail bucket lifecycle policy (cost optimization)
 resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
@@ -245,6 +254,15 @@ resource "aws_s3_bucket_public_access_block" "config" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# Config bucket ownership controls (NEW - ADD THIS)
+resource "aws_s3_bucket_ownership_controls" "config" {
+  bucket = aws_s3_bucket.config.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
 }
 
 # Config bucket lifecycle policy (longer retention than CloudTrail)
