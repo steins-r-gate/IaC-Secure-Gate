@@ -1,23 +1,30 @@
-# ==================================================================
-# Outputs for the development environment
+﻿# ==================================================================
+# Phase 1 - Development Environment Outputs
 # terraform/environments/dev/outputs.tf
 # ==================================================================
 
-output "demo_bucket_name" {
-  description = "Name of the demo S3 bucket"
-  value       = module.s3.demo_bucket_name
+# Foundation Module Outputs
+output "kms_key_id" {
+  description = "KMS key ID for log encryption"
+  value       = module.foundation.kms_key_id
 }
 
-output "demo_bucket_arn" {
-  description = "ARN of the demo S3 bucket"
-  value       = module.s3.demo_bucket_arn
+output "kms_key_arn" {
+  description = "KMS key ARN for log encryption"
+  value       = module.foundation.kms_key_arn
 }
 
-output "demo_bucket_url" {
-  description = "S3 console URL for the demo bucket"
-  value       = "https://s3.console.aws.amazon.com/s3/buckets/${module.s3.demo_bucket_name}"
+output "cloudtrail_bucket_name" {
+  description = "CloudTrail logs S3 bucket name"
+  value       = module.foundation.cloudtrail_bucket_name
 }
 
+output "config_bucket_name" {
+  description = "Config snapshots S3 bucket name"
+  value       = module.foundation.config_bucket_name
+}
+
+# Account Information
 output "aws_account_id" {
   description = "AWS Account ID"
   value       = data.aws_caller_identity.current.account_id
