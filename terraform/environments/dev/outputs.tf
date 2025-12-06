@@ -24,6 +24,27 @@ output "config_bucket_name" {
   value       = module.foundation.config_bucket_name
 }
 
+# CloudTrail Module Outputs
+output "cloudtrail_trail_id" {
+  description = "CloudTrail trail ID"
+  value       = module.cloudtrail.trail_id
+}
+
+output "cloudtrail_trail_arn" {
+  description = "CloudTrail trail ARN"
+  value       = module.cloudtrail.trail_arn
+}
+
+output "cloudtrail_trail_name" {
+  description = "CloudTrail trail name"
+  value       = module.cloudtrail.trail_name
+}
+
+output "cloudtrail_home_region" {
+  description = "CloudTrail trail home region"
+  value       = module.cloudtrail.trail_home_region
+}
+
 # Account Information
 output "aws_account_id" {
   description = "AWS Account ID"
