@@ -82,11 +82,11 @@ module "cloudtrail" {
   common_tags  = local.common_tags
 
   # Use foundation module outputs
-  kms_key_id             = module.foundation.kms_key_id
+  kms_key_id             = module.foundation.kms_key_arn # ← FIXED (use ARN not ID)
   cloudtrail_bucket_name = module.foundation.cloudtrail_bucket_name
 
   # CloudTrail configuration
-  enable_log_file_validation    = true  # CIS 3.2
-  is_multi_region_trail         = true  # CIS 3.1
-  include_global_service_events = true  # Capture IAM events
+  enable_log_file_validation    = true # CIS 3.2
+  is_multi_region_trail         = true # CIS 3.1
+  include_global_service_events = true # Capture IAM events
 }
