@@ -57,3 +57,5 @@ logs/
 # Backup directories (from scripts)
 backup-*/
 **/backup-*/
+
+aws-env.ps1
