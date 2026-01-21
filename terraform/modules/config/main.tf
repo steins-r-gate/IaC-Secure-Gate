@@ -7,70 +7,18 @@
 locals {
   config_name = "${var.project_name}-${var.environment}-config"
 
+  # Determine whether to include global resource types
+  # If explicitly set via variable, use that; otherwise use is_primary_region
+  include_global_resources = coalesce(var.include_global_resource_types, var.is_primary_region)
+
   # Common tags for all Config resources
   config_tags = merge(var.common_tags, {
     Module  = "config"
     Service = "AWS-Config"
   })
-}
 
-# ==================================================================
-# IAM Role for AWS Config
-# ==================================================================
-
-# Trust policy allowing Config service to assume this role
-data "aws_iam_policy_document" "config_assume_role" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["config.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-# IAM Role for Config service
-resource "aws_iam_role" "config" {
-  name               = "${local.config_name}-role"
-  assume_role_policy = data.aws_iam_policy_document.config_assume_role.json
-  description        = "Service role for AWS Config recorder"
-
-  tags = merge(local.config_tags, {
-    Name = "${local.config_name}-role"
-  })
-}
-
-# Attach AWS managed policy for Config
-resource "aws_iam_role_policy_attachment" "config" {
-  role       = aws_iam_role.config.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/ConfigRole"
-}
-
-# Additional policy for S3 bucket access
-resource "aws_iam_role_policy" "config_s3" {
-  name = "${local.config_name}-s3-policy"
-  role = aws_iam_role.config.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetBucketVersioning",
-          "s3:PutObject",
-          "s3:GetObject"
-        ]
-        Resource = [
-          var.config_bucket_arn,
-          "${var.config_bucket_arn}/*"
-        ]
-      }
-    ]
-  })
+  # SNS topic for delivery channel (if enabled)
+  sns_topic_arn = var.enable_sns_notifications ? aws_sns_topic.config[0].arn : var.sns_topic_arn
 }
 
 # ==================================================================
@@ -81,11 +29,18 @@ resource "aws_config_configuration_recorder" "main" {
   name     = "${local.config_name}-recorder"
   role_arn = aws_iam_role.config.arn
 
-  # Record all supported resources including global (IAM)
   recording_group {
-    all_supported                 = true
-    include_global_resource_types = true # CIS 3.5
+    all_supported = true
+    # Only record global resources (IAM, etc.) in primary region to avoid duplication
+    include_global_resource_types = local.include_global_resources
   }
+
+  # Ensure IAM role and all policies are attached before creating recorder
+  depends_on = [
+    aws_iam_role_policy_attachment.config,
+    aws_iam_role_policy.config_s3,
+    aws_iam_role_policy.config_kms
+  ]
 }
 
 # ==================================================================
@@ -95,12 +50,17 @@ resource "aws_config_configuration_recorder" "main" {
 resource "aws_config_delivery_channel" "main" {
   name           = "${local.config_name}-delivery"
   s3_bucket_name = var.config_bucket_name
+  s3_key_prefix  = var.s3_key_prefix
+  s3_kms_key_arn = var.config_bucket_kms_key_arn
+  sns_topic_arn  = local.sns_topic_arn
 
-  # Daily snapshots
   snapshot_delivery_properties {
-    delivery_frequency = "TwentyFour_Hours"
+    delivery_frequency = var.snapshot_delivery_frequency
   }
 
+  # CRITICAL: Delivery channel does NOT depend on recorder
+  # The recorder resource must exist, but should not be in depends_on
+  # AWS requires delivery channel to exist BEFORE starting the recorder
   depends_on = [aws_config_configuration_recorder.main]
 }
 
@@ -112,128 +72,63 @@ resource "aws_config_configuration_recorder_status" "main" {
   name       = aws_config_configuration_recorder.main.name
   is_enabled = true
 
-  depends_on = [aws_config_delivery_channel.main]
+  # CRITICAL: Recorder can only start after:
+  # 1. Delivery channel is created
+  # 2. IAM role has all permissions attached
+  # 3. S3 bucket is configured (handled by foundation module)
+  depends_on = [
+    aws_config_delivery_channel.main,
+    aws_iam_role_policy_attachment.config,
+    aws_iam_role_policy.config_s3,
+    aws_iam_role_policy.config_kms
+  ]
 }
 
 # ==================================================================
-# AWS Config Rules - CIS AWS Foundations Benchmark
+# Optional: SNS Topic for Config Notifications
 # ==================================================================
 
-# Rule 1: Root account MFA (CIS 1.5)
-resource "aws_config_config_rule" "root_mfa_enabled" {
-  name        = "root-account-mfa-enabled"
-  description = "Checks whether MFA is enabled for root user (CIS 1.5)"
+resource "aws_sns_topic" "config" {
+  count = var.enable_sns_notifications ? 1 : 0
 
-  source {
-    owner             = "AWS"
-    source_identifier = "ROOT_ACCOUNT_MFA_ENABLED"
-  }
+  name              = "${local.config_name}-notifications"
+  display_name      = "AWS Config notifications for ${var.environment}"
+  kms_master_key_id = var.config_bucket_kms_key_arn != "" ? var.config_bucket_kms_key_arn : null
 
-  depends_on = [aws_config_configuration_recorder.main]
-}
-
-# Rule 2: IAM password policy (CIS 1.8-1.11)
-resource "aws_config_config_rule" "iam_password_policy" {
-  name        = "iam-password-policy"
-  description = "Checks IAM password policy meets CIS requirements"
-
-  source {
-    owner             = "AWS"
-    source_identifier = "IAM_PASSWORD_POLICY"
-  }
-
-  # CIS requirements
-  input_parameters = jsonencode({
-    RequireUppercaseCharacters = true
-    RequireLowercaseCharacters = true
-    RequireSymbols             = true
-    RequireNumbers             = true
-    MinimumPasswordLength      = 14
-    PasswordReusePrevention    = 24
-    MaxPasswordAge             = 90
+  tags = merge(local.config_tags, {
+    Name = "${local.config_name}-notifications"
   })
-
-  depends_on = [aws_config_configuration_recorder.main]
 }
 
-# Rule 3: Access keys rotated (CIS 1.14)
-resource "aws_config_config_rule" "access_keys_rotated" {
-  name        = "access-keys-rotated"
-  description = "Checks if IAM access keys are rotated within 90 days (CIS 1.14)"
+resource "aws_sns_topic_policy" "config" {
+  count = var.enable_sns_notifications ? 1 : 0
 
-  source {
-    owner             = "AWS"
-    source_identifier = "ACCESS_KEYS_ROTATED"
-  }
-
-  input_parameters = jsonencode({
-    maxAccessKeyAge = 90
-  })
-
-  depends_on = [aws_config_configuration_recorder.main]
+  arn    = aws_sns_topic.config[0].arn
+  policy = data.aws_iam_policy_document.sns_topic_policy[0].json
 }
 
-# Rule 4: IAM user MFA (CIS 1.10)
-resource "aws_config_config_rule" "iam_user_mfa_enabled" {
-  name        = "iam-user-mfa-enabled"
-  description = "Checks if MFA is enabled for IAM users with console access (CIS 1.10)"
+data "aws_iam_policy_document" "sns_topic_policy" {
+  count = var.enable_sns_notifications ? 1 : 0
 
-  source {
-    owner             = "AWS"
-    source_identifier = "IAM_USER_MFA_ENABLED"
+  statement {
+    sid    = "ConfigPublish"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    actions = [
+      "SNS:Publish"
+    ]
+
+    resources = [aws_sns_topic.config[0].arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
   }
-
-  depends_on = [aws_config_configuration_recorder.main]
-}
-
-# Rule 5: CloudTrail enabled (CIS 3.1)
-resource "aws_config_config_rule" "cloudtrail_enabled" {
-  name        = "cloudtrail-enabled"
-  description = "Checks if CloudTrail is enabled in all regions (CIS 3.1)"
-
-  source {
-    owner             = "AWS"
-    source_identifier = "CLOUD_TRAIL_ENABLED"
-  }
-
-  depends_on = [aws_config_configuration_recorder.main]
-}
-
-# Rule 6: CloudTrail log validation (CIS 3.2)
-resource "aws_config_config_rule" "cloudtrail_log_file_validation" {
-  name        = "cloudtrail-log-file-validation-enabled"
-  description = "Checks if CloudTrail log file validation is enabled (CIS 3.2)"
-
-  source {
-    owner             = "AWS"
-    source_identifier = "CLOUD_TRAIL_LOG_FILE_VALIDATION_ENABLED"
-  }
-
-  depends_on = [aws_config_configuration_recorder.main]
-}
-
-# Rule 7: S3 public read prohibited (CIS 2.3.1)
-resource "aws_config_config_rule" "s3_bucket_public_read_prohibited" {
-  name        = "s3-bucket-public-read-prohibited"
-  description = "Checks S3 buckets do not allow public read access (CIS 2.3.1)"
-
-  source {
-    owner             = "AWS"
-    source_identifier = "S3_BUCKET_PUBLIC_READ_PROHIBITED"
-  }
-
-  depends_on = [aws_config_configuration_recorder.main]
-}
-
-# Rule 8: S3 public write prohibited (CIS 2.3.1)
-resource "aws_config_config_rule" "s3_bucket_public_write_prohibited" {
-  name        = "s3-bucket-public-write-prohibited"
-  description = "Checks S3 buckets do not allow public write access (CIS 2.3.1)"
-
-  source {
-    owner             = "AWS"
-    source_identifier = "S3_BUCKET_PUBLIC_WRITE_PROHIBITED"
-  }
-
-  depends_on = [aws_config_configuration_recorder.main]
 }

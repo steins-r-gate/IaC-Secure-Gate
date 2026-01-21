@@ -9,10 +9,13 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+crash.log
+crash.*.log
 
 # Ignore tfvars files, but keep example files
 *.tfvars
 !terraform.tfvars.example
+*.auto.tfvars
 *.backup
 .DS_Store
 
@@ -31,6 +34,10 @@ env/
 # AWS
 .aws/
 *.pem
+*.ppk
+*credentials*
+*access_key*
+*secret_key*
 
 # VS Code
 .vscode/*
@@ -59,3 +66,6 @@ backup-*/
 **/backup-*/
 
 aws-env.ps1
+
+# Claude Code
+.claude/

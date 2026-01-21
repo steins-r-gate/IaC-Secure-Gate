@@ -1,4 +1,4 @@
-﻿# ==================================================================
+# ==================================================================
 # Phase 1 - Development Environment
 # terraform/environments/dev/main.tf
 # ==================================================================
@@ -48,7 +48,6 @@ locals {
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
-    Region      = var.aws_region
   }
 }
 
@@ -62,8 +61,6 @@ module "foundation" {
 
   environment  = local.environment
   project_name = local.project_name
-  account_id   = data.aws_caller_identity.current.account_id
-  region       = data.aws_region.current.name
   common_tags  = local.common_tags
 
   # Retention settings (can override defaults)
@@ -72,21 +69,136 @@ module "foundation" {
 }
 
 # CloudTrail Module (Audit Logging)
+# Depends on foundation S3 bucket policy and KMS key policy being ready
 module "cloudtrail" {
   source = "../../modules/cloudtrail"
 
   environment  = local.environment
   project_name = local.project_name
-  account_id   = data.aws_caller_identity.current.account_id
-  region       = data.aws_region.current.name
   common_tags  = local.common_tags
 
-  # Use foundation module outputs
-  kms_key_id             = module.foundation.kms_key_arn # ← FIXED (use ARN not ID)
+  # Foundation module outputs (corrected identifiers)
+  kms_key_arn            = module.foundation.kms_key_arn
   cloudtrail_bucket_name = module.foundation.cloudtrail_bucket_name
 
-  # CloudTrail configuration
+  # CloudTrail configuration (CIS AWS Foundations Benchmark)
   enable_log_file_validation    = true # CIS 3.2
   is_multi_region_trail         = true # CIS 3.1
-  include_global_service_events = true # Capture IAM events
+  include_global_service_events = true # Capture IAM events in home region
+
+  # Optional features (disabled by default to minimize costs in dev)
+  enable_cloudwatch_logs    = false
+  enable_sns_notifications  = false
+  enable_insights           = false
+  enable_s3_data_events     = false
+  enable_lambda_data_events = false
+
+  # Explicit dependency: CloudTrail requires foundation bucket policy ready
+  # Module outputs automatically create implicit dependencies, but adding
+  # explicit dependency on bucket policy for determinism
+  depends_on = [
+    module.foundation
+  ]
+}
+
+# AWS Config Module (Configuration Compliance)
+# Depends on foundation S3 bucket policy and KMS key policy being ready
+module "config" {
+  source = "../../modules/config"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Foundation module outputs
+  config_bucket_name        = module.foundation.config_bucket_name
+  config_bucket_arn         = module.foundation.config_bucket_arn
+  config_bucket_kms_key_arn = module.foundation.kms_key_arn
+
+  # Config recorder settings
+  is_primary_region             = true # Record global resources (IAM, etc.) in this region
+  include_global_resource_types = true # Explicitly record IAM, CloudFront, Route53, etc.
+  snapshot_delivery_frequency   = "TwentyFour_Hours"
+
+  # Config rules (CIS AWS Foundations Benchmark)
+  enable_config_rules = true # Deploy 8 managed rules for CIS compliance
+
+  # Optional features (disabled by default to minimize costs in dev)
+  enable_sns_notifications = false
+
+  # Explicit dependency: Config requires foundation bucket policy + KMS policy ready
+  depends_on = [
+    module.foundation
+  ]
+}
+
+# ==================================================================
+# IAM Access Analyzer Module (External Access Detection)
+# No dependencies - standalone service
+# ==================================================================
+
+module "access_analyzer" {
+  source = "../../modules/access-analyzer"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Analyzer configuration
+  analyzer_type = "ACCOUNT" # Single account scope for Phase 1
+
+  # Archive rule (auto-archive old findings)
+  enable_archive_rule              = true
+  archive_findings_older_than_days = 90 # Dev: 90 days (Prod: 365 days)
+
+  # Optional: SNS notifications (disabled by default to save costs)
+  enable_sns_notifications = false
+  kms_key_arn              = module.foundation.kms_key_arn # If notifications enabled
+  sns_email_subscriptions  = []                            # Add emails if notifications enabled
+
+  # No dependencies - standalone service
+}
+
+# ==================================================================
+# Security Hub Module (Centralized Security Findings)
+# Depends on detection services being enabled for proper integration
+# ==================================================================
+
+module "security_hub" {
+  source = "../../modules/security-hub"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Standards configuration
+  enable_cis_standard           = true
+  cis_standard_version          = "1.4.0" # Stable version with 25 controls
+  enable_foundational_standard  = true
+  foundational_standard_version = "1.0.0" # 200+ controls
+
+  # Product integrations
+  enable_config_integration          = true
+  enable_access_analyzer_integration = true
+
+  # Multi-region aggregation (disabled for Phase 1 single-region)
+  enable_finding_aggregation = false
+
+  # Optional: Disable noisy controls in dev (empty set = all enabled)
+  disabled_control_ids = [
+    # Example: Uncomment to disable specific controls
+    # "cis-aws-foundations-benchmark/v/1.4.0/1.1", # Root account MFA
+  ]
+
+  # Optional: SNS for critical findings (disabled to save costs)
+  enable_critical_finding_notifications = false
+  kms_key_arn                           = module.foundation.kms_key_arn
+  sns_email_subscriptions               = []
+
+  # CRITICAL: Depends on detection services being enabled
+  # Security Hub integrations require these services to be active
+  depends_on = [
+    module.config,
+    module.access_analyzer
+  ]
 }

@@ -1,109 +1,178 @@
-# 📘 IAM-Secure-Gate Demo - README
+# 🛡️ IaC-Secure-Gate - AWS Security Baseline Infrastructure
 
 ## 🎯 Project Overview
 
-**IAM-Secure-Gate** is an automated cloud security infrastructure system that demonstrates modern Infrastructure as Code (IaC) practices using Terraform and AWS. This demo showcases how to deploy production-ready, secure cloud infrastructure in under 60 seconds with security best practices enforced automatically.
+**IaC-Secure-Gate** is a production-grade AWS security baseline infrastructure built with Terraform, implementing CIS AWS Foundations Benchmark controls for detection, logging, and continuous compliance monitoring. This project demonstrates modern Infrastructure as Code (IaC) practices with security-first design principles.
 
 ### **The Problem**
 
-Manual cloud infrastructure setup is:
+Manual cloud security setup is:
 
-- ⏰ Time-consuming (20+ minutes per resource)
-- 🐛 Error-prone (human configuration mistakes)
-- 🔓 Security-risky (missing security controls)
-- 📊 Inconsistent (different results each time)
-- 📝 Unauditable (no change tracking)
+- ⏰ Time-consuming (hours to configure logging, monitoring, and compliance)
+- 🐛 Error-prone (misconfigured trails, missing encryption, incomplete coverage)
+- 🔓 Security-risky (gaps in audit logging, no compliance validation)
+- 📊 Inconsistent (different security postures across environments)
+- 📝 Unauditable (no centralized security event tracking)
+- 💰 Costly (over-provisioned resources, unused features)
 
 ### **The Solution**
 
-Automated infrastructure deployment using:
+Automated security baseline deployment using:
 
-- **Infrastructure as Code** - Define infrastructure in version-controlled code
-- **Security by Default** - Bake security into every deployment
-- **One-Click Deployment** - 60 seconds from code to production
-- **100% Repeatable** - Identical results every time
-- **Fully Auditable** - Complete change history in Git
+- **Infrastructure as Code** - Version-controlled, peer-reviewed security infrastructure
+- **CIS Compliance by Default** - Automated CIS AWS Foundations Benchmark controls
+- **Multi-Layer Detection** - CloudTrail + AWS Config + managed rules
+- **KMS Encryption** - All logs encrypted with customer-managed keys
+- **Cost-Optimized** - Dev (~$7/month), Prod-ready with optional features
+- **Deterministic Deployment** - No flaky applies, proper dependency management
 
 ---
 
 ## 🏗️ Architecture
 
+### Phase 1: Detection Baseline
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    IAM-Secure-Gate                      │
-│                      Demo System                        │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                   IaC-Secure-Gate                           │
+│            AWS Security Baseline (Phase 1)                  │
+└─────────────────────────────────────────────────────────────┘
                            │
                            ↓
-┌─────────────────────────────────────────────────────────┐
-│                     Terraform                           │
-│              Infrastructure as Code                     │
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   main.tf    │  │ variables.tf │  │  outputs.tf  │ │
-│  │   (config)   │  │  (inputs)    │  │  (results)   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  Terraform Modules                          │
+│                                                             │
+│  ┌────────────┐   ┌─────────────┐   ┌─────────────┐       │
+│  │ Foundation │ → │  CloudTrail │   │    Config   │       │
+│  │            │   │             │   │             │       │
+│  │ • KMS CMK  │   │ • Multi-    │   │ • Recorder  │       │
+│  │ • S3 Logs  │   │   Region    │   │ • 8 CIS     │       │
+│  │ • Policies │   │ • Encrypted │   │   Rules     │       │
+│  └────────────┘   └─────────────┘   └─────────────┘       │
+└─────────────────────────────────────────────────────────────┘
                            │
                            ↓
-┌─────────────────────────────────────────────────────────┐
-│                    AWS Cloud                            │
-│                                                         │
-│  ┌───────────────────────────────────────────────────┐ │
-│  │              S3 Bucket (Demo)                     │ │
-│  │  ┌─────────────────────────────────────────────┐ │ │
-│  │  │  ✅ Versioning Enabled                      │ │ │
-│  │  │  ✅ Encryption (AES-256)                    │ │ │
-│  │  │  ✅ Public Access Blocked (4 layers)        │ │ │
-│  │  │  ✅ HTTPS-Only Policy                       │ │ │
-│  │  │  ✅ Ownership Controls                      │ │ │
-│  │  │  ✅ Security Policy Enforced                │ │ │
-│  │  └─────────────────────────────────────────────┘ │ │
-│  └───────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      AWS Cloud                              │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ Foundation (Security Infrastructure)                 │  │
+│  │                                                      │  │
+│  │  ✅ KMS CMK (auto-rotation enabled)                 │  │
+│  │  ✅ CloudTrail S3 bucket (encrypted, versioned)     │  │
+│  │  ✅ Config S3 bucket (encrypted, versioned)         │  │
+│  │  ✅ Lifecycle policies (90-day retention)           │  │
+│  │  ✅ Public access blocked (all layers)              │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ CloudTrail (Audit Logging)                           │  │
+│  │                                                      │  │
+│  │  ✅ Multi-region trail (CIS 3.1)                    │  │
+│  │  ✅ Log file validation (CIS 3.2)                   │  │
+│  │  ✅ KMS encryption (CIS 3.3)                        │  │
+│  │  ✅ Global service events (IAM/STS)                 │  │
+│  │  ✅ Management events (read + write)                │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ AWS Config (Compliance Monitoring)                   │  │
+│  │                                                      │  │
+│  │  ✅ Recorder (all resource types)                   │  │
+│  │  ✅ Global resources (IAM, Route53)                 │  │
+│  │  ✅ 24-hour snapshot delivery                       │  │
+│  │  ✅ 8 CIS compliance rules:                         │  │
+│  │     • cloudtrail-enabled                            │  │
+│  │     • multi-region-cloudtrail-enabled               │  │
+│  │     • s3-bucket-public-read-prohibited              │  │
+│  │     • s3-bucket-public-write-prohibited             │  │
+│  │     • s3-bucket-server-side-encryption-enabled      │  │
+│  │     • iam-password-policy                           │  │
+│  │     • root-account-mfa-enabled                      │  │
+│  │     • iam-user-mfa-enabled                          │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 🔒 Security Features
 
-| Feature                 | Description                  | Benefit                      |
-| ----------------------- | ---------------------------- | ---------------------------- |
-| **Versioning**          | Every file change tracked    | Accidental deletion recovery |
-| **Encryption at Rest**  | AES-256 encryption automatic | Data protection compliance   |
-| **Public Access Block** | 4-layer protection system    | Zero public exposure risk    |
-| **HTTPS-Only Policy**   | Encrypted transport enforced | Secure data in transit       |
-| **Bucket Key Enabled**  | Reduced KMS costs            | Cost optimization + security |
-| **Ownership Controls**  | BucketOwnerEnforced          | Prevent ACL-based attacks    |
+### CIS AWS Foundations Benchmark Compliance
+
+| Control | Description | Implementation | Status |
+|---------|-------------|----------------|--------|
+| **CIS 3.1** | Multi-region CloudTrail enabled | CloudTrail module with `is_multi_region_trail = true` | ✅ |
+| **CIS 3.2** | CloudTrail log file validation | CloudTrail module with `enable_log_file_validation = true` | ✅ |
+| **CIS 3.3** | CloudTrail logs encrypted with KMS | Foundation KMS key + CloudTrail integration | ✅ |
+| **CIS 3.4** | CloudTrail integrated with CloudWatch (optional) | Available via `enable_cloudwatch_logs = true` | 🟡 |
+| **CIS 3.6** | S3 bucket access logging | Foundation module bucket logging | ✅ |
+| **CIS 3.7** | CloudTrail logs in dedicated S3 bucket | Foundation module with service-specific buckets | ✅ |
+
+### Security Layers
+
+| Layer | Feature | Implementation |
+|-------|---------|----------------|
+| **Encryption** | KMS CMK with auto-rotation | Foundation module KMS key |
+| **Encryption** | S3 bucket encryption (KMS) | Foundation S3 bucket encryption |
+| **Encryption** | CloudTrail log encryption | CloudTrail → Foundation KMS |
+| **Access Control** | S3 public access block (4 layers) | Foundation S3 configuration |
+| **Access Control** | S3 bucket policies (least-privilege) | CloudTrail/Config service policies |
+| **Access Control** | IAM roles (least-privilege) | Config IAM role with scoped policies |
+| **Integrity** | S3 versioning enabled | Foundation S3 versioning |
+| **Integrity** | CloudTrail log file validation | CloudTrail digest files |
+| **Audit** | CloudTrail multi-region logging | All API calls logged |
+| **Compliance** | AWS Config continuous monitoring | 8 managed Config rules |
+| **Retention** | 90-day log retention (configurable) | S3 lifecycle policies |
 
 ---
 
 ## 📁 Project Structure
 
 ```
-IAM-SECURE-GATE/
+IaC-Secure-Gate/
 │
 ├── terraform/
-│   ├── environments/
+│   ├── environments/               # Environment-specific configs
 │   │   └── dev/
-│   │       ├── main.tf          # Main configuration
-│   │       ├── variables.tf     # Input variables
-│   │       └── outputs.tf       # Output values
+│   │       ├── main.tf             # Module composition
+│   │       ├── variables.tf        # Environment variables
+│   │       ├── outputs.tf          # Environment outputs
+│   │       ├── ENVIRONMENT_CHANGES.md
+│   │       └── VERIFICATION_CHECKLIST.md
 │   │
-│   └── modules/
-│       └── s3/
-│           ├── main.tf          # S3 bucket resources
-│           ├── variables.tf     # Module variables
-│           └── outputs.tf       # Module outputs
+│   └── modules/                    # Reusable Terraform modules
+│       ├── foundation/             # KMS + S3 foundation
+│       │   ├── main.tf
+│       │   ├── kms.tf              # KMS CMK configuration
+│       │   ├── s3-cloudtrail.tf    # CloudTrail bucket
+│       │   ├── s3-config.tf        # Config bucket
+│       │   ├── variables.tf
+│       │   ├── outputs.tf
+│       │   └── README.md
+│       │
+│       ├── cloudtrail/             # Multi-region audit trail
+│       │   ├── main.tf
+│       │   ├── variables.tf
+│       │   ├── outputs.tf
+│       │   ├── README.md
+│       │   ├── CHANGES_SUMMARY.md
+│       │   └── VERIFICATION_CHECKLIST.md
+│       │
+│       └── config/                 # AWS Config compliance
+│           ├── main.tf
+│           ├── variables.tf
+│           ├── outputs.tf
+│           ├── iam.tf              # Config IAM role
+│           ├── rules.tf            # CIS compliance rules
+│           └── README.md
 │
 ├── scripts/
-│   ├── Set-AWSEnvironment.ps1   # AWS credential setup
-│   ├── Deploy-Demo.ps1          # Automated deployment
-│   ├── Cleanup-Demo.ps1         # Resource cleanup
-│   └── Verify-Demo.ps1          # Verification checks
+│   ├── deployment-status.ps1       # Quick status check
+│   └── (legacy demo scripts)
 │
-├── .gitignore                   # Git exclusions
-└── README.md                    # This file
+├── .gitignore                      # Security-enhanced patterns
+└── README.md                       # This file
 ```
 
 ---
@@ -112,42 +181,45 @@ IAM-SECURE-GATE/
 
 ### **Prerequisites**
 
-1. **AWS Account** with appropriate permissions
-
-   - S3 full access
-   - IAM read access (for identity verification)
+1. **AWS Account** with appropriate IAM permissions:
+   - S3: CreateBucket, PutBucketPolicy, PutBucketEncryption, etc.
+   - KMS: CreateKey, PutKeyPolicy, EnableKeyRotation
+   - CloudTrail: CreateTrail, StartLogging, PutEventSelectors
+   - Config: PutConfigurationRecorder, PutDeliveryChannel, PutConfigRule
+   - IAM: CreateRole, AttachRolePolicy (for Config service role)
 
 2. **Software Requirements**
 
-```powershell
-   # Check installations
-   aws --version        # AWS CLI v2.x+
-   terraform version    # Terraform v1.5.0+
-   git --version        # Git v2.x+
+```bash
+# Check installations
+aws --version        # AWS CLI v2.x+
+terraform version    # Terraform v1.5.0+
+git --version        # Git v2.x+
 ```
 
 3. **Install Missing Tools**
 
-```powershell
-   # AWS CLI
-   winget install Amazon.AWSCLI
+```bash
+# AWS CLI (Windows)
+winget install Amazon.AWSCLI
 
-   # Terraform
-   # Download from: https://www.terraform.io/downloads
+# Terraform (Windows)
+# Download from: https://www.terraform.io/downloads
+# Or use: choco install terraform
 
-   # Git
-   winget install Git.Git
+# Git (Windows)
+winget install Git.Git
 ```
 
 ### **Installation**
 
-```powershell
+```bash
 # 1. Clone the repository
 git clone <repository-url>
-cd IAM-Secure-Gate
+cd IaC-Secure-Gate
 
-# 2. Switch to demo branch
-git checkout demo
+# 2. Checkout the phase-1 branch
+git checkout phase-1
 
 # 3. Configure AWS credentials
 aws configure
@@ -158,158 +230,246 @@ aws configure
 # - Output format: json
 
 # 4. Verify AWS access
-.\scripts\Set-AWSEnvironment.ps1
+aws sts get-caller-identity
 ```
 
 ---
 
 ## 🎮 Usage
 
-### **Deploy Infrastructure**
+### **Deploy Phase 1 Security Baseline**
 
-```powershell
-# Full guided deployment
-.\scripts\Deploy-Demo.ps1
+```bash
+# Navigate to dev environment
+cd terraform/environments/dev
 
-# Automatic approval (skip confirmations)
-.\scripts\Deploy-Demo.ps1 -AutoApprove
+# Initialize Terraform (download providers and modules)
+terraform init
+
+# Review what will be created (~45-50 resources)
+terraform plan
+
+# Deploy the infrastructure
+terraform apply
 ```
 
 **Expected Output:**
 
 ```
-========================================
-  IAM-SECURE-GATE DEMO DEPLOYMENT
-========================================
+Plan: 47 resources to add, 0 to change, 0 to destroy.
 
-> Checking AWS credentials...
-  OK - Account ID: 826232761554
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
 
-> Checking Terraform...
-  OK - Terraform v1.5.0
+  Enter a value: yes
 
-> Deploying infrastructure...
+module.foundation.aws_kms_key.logs: Creating...
+module.foundation.aws_s3_bucket.cloudtrail: Creating...
+module.foundation.aws_s3_bucket.config: Creating...
+...
+module.cloudtrail.aws_cloudtrail.main: Creating...
+module.config.aws_config_configuration_recorder.main: Creating...
+module.config.aws_config_config_rule.cloudtrail_enabled: Creating...
+...
 
-Apply complete! Resources: 6 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 47 added, 0 changed, 0 destroyed.
 
-========================================
-  DEPLOYMENT SUCCESSFUL!
-========================================
+Outputs:
 
-Deployment Summary:
-  Environment:  dev
-  AWS Account:  826232761554
-  Region:       eu-west-1
-
-Created Resources:
-  S3 Bucket:    iam-security-dev-demo-826232761554
-
-Deployment completed in 45.3 seconds
+deployment_summary = {
+  "cloudtrail_cis_3_1_compliant" = true
+  "cloudtrail_cis_3_2_compliant" = true
+  "config_recorder_enabled" = true
+  "config_rules_deployed" = 8
+  "environment" = "dev"
+  "foundation_cis_compliant" = true
+  "phase_1_ready" = true
+  "region" = "eu-west-1"
+}
 ```
+
+**Deployment Time:** 2-3 minutes for complete Phase 1 baseline
+
+---
 
 ### **Verify Deployment**
 
-```powershell
-# Run verification checks
-.\scripts\Verify-Demo.ps1
+```bash
+cd terraform/environments/dev
+
+# Check deployment summary
+terraform output deployment_summary
+
+# Verify CloudTrail is logging
+TRAIL_NAME=$(terraform output -raw cloudtrail_trail_name)
+aws cloudtrail get-trail-status --name "$TRAIL_NAME" --region eu-west-1
+
+# Verify Config recorder is running
+RECORDER_NAME=$(terraform output -raw config_recorder_name)
+aws configservice describe-configuration-recorder-status \
+  --configuration-recorder-names "$RECORDER_NAME" \
+  --region eu-west-1
+
+# Quick deployment status check
+../../scripts/deployment-status.ps1
 ```
 
-**Expected Output:**
+**For comprehensive verification**, see: [terraform/environments/dev/VERIFICATION_CHECKLIST.md](terraform/environments/dev/VERIFICATION_CHECKLIST.md)
 
-```
-  Checking AWS Credentials... ✅
-  Checking Terraform Installation... ✅
-  Checking S3 Bucket Exists... ✅
-  Checking Versioning Enabled... ✅
-  Checking Encryption Enabled... ✅
-  Checking Public Access Blocked... ✅
-
-Success Rate: 100%
-🎉 Demo is fully operational!
-```
+---
 
 ### **View in AWS Console**
 
-```powershell
-# Get console URL
-cd terraform\environments\dev
-terraform output demo_bucket_url
-```
+**CloudTrail:**
+- Console: https://console.aws.amazon.com/cloudtrail
+- Search for: `iam-secure-gate-dev-trail`
+- Verify: Multi-region enabled, Log validation enabled, Logging status
 
-Or manually navigate to:
+**AWS Config:**
+- Console: https://console.aws.amazon.com/config
+- Check: Recorder status (recording), Delivery channel, 8 rules deployed
+- Review: Compliance dashboard for rule status
 
-- **S3 Console**: https://console.aws.amazon.com/s3
-- Search for: `iam-security-dev-demo-*`
+**S3 Buckets:**
+- Console: https://console.aws.amazon.com/s3
+- Find: `iam-secure-gate-dev-cloudtrail-*` and `iam-secure-gate-dev-config-*`
+- Verify: Encryption enabled, Versioning enabled, Public access blocked
+
+**KMS:**
+- Console: https://console.aws.amazon.com/kms
+- Find: `alias/iam-secure-gate-dev-logs`
+- Verify: Key rotation enabled
+
+---
 
 ### **Cleanup Resources**
 
-```powershell
-# Guided cleanup (with confirmations)
-.\scripts\Cleanup-Demo.ps1
+```bash
+cd terraform/environments/dev
 
-# Force cleanup (no confirmations)
-.\scripts\Cleanup-Demo.ps1 -Force
+# Preview what will be destroyed
+terraform plan -destroy
+
+# Destroy all resources
+terraform destroy
 ```
 
-**Important:** If bucket contains files, empty it first:
+**Important Notes:**
+- S3 buckets must be empty before destruction
+- If buckets contain logs, Terraform will fail with "BucketNotEmpty"
+- To force empty and destroy:
 
-```powershell
-$bucket = "iam-security-dev-demo-826232761554"
-aws s3 rm s3://$bucket/ --recursive
+```bash
+# Get bucket names
+CLOUDTRAIL_BUCKET=$(terraform output -raw cloudtrail_bucket_name)
+CONFIG_BUCKET=$(terraform output -raw config_bucket_name)
+
+# Empty buckets (including all versions)
+aws s3 rm s3://$CLOUDTRAIL_BUCKET/ --recursive
+aws s3 rm s3://$CONFIG_BUCKET/ --recursive
+
+# Then destroy
+terraform destroy
 ```
 
 ---
 
 ## 🧪 Testing & Verification
 
-### **Manual Verification in AWS Console**
+### **Automated Verification**
 
-1. **Navigate to S3 Bucket**
+See the comprehensive checklist: [terraform/environments/dev/VERIFICATION_CHECKLIST.md](terraform/environments/dev/VERIFICATION_CHECKLIST.md)
 
-   - Go to AWS Console → S3
-   - Find bucket: `iam-security-dev-demo-<account-id>`
+The checklist includes:
+- ✅ Pre-deployment validation (fmt, init, validate)
+- ✅ Deployment testing (clean apply, idempotency)
+- ✅ Post-deployment verification (18-step checklist)
+- ✅ Security testing (CloudTrail events, Config rules)
+- ✅ Cost verification
+- ✅ CIS compliance verification
 
-2. **Check Properties Tab**
+---
 
-   - ✅ Bucket Versioning: **Enabled**
-   - ✅ Default encryption: **Enabled (SSE-S3 with AES-256)**
-
-3. **Check Permissions Tab**
-   - ✅ Block all public access: **On** (all 4 settings)
-   - ✅ Bucket policy: **HTTPS-only enforcement**
-
-### **AWS CloudShell Verification**
+### **Quick Manual Verification**
 
 ```bash
-# Open CloudShell in AWS Console
-# Set your bucket name
-export BUCKET_NAME=iam-security-dev-demo-826232761554
+cd terraform/environments/dev
 
-# Check versioning
-aws s3api get-bucket-versioning --bucket $BUCKET_NAME
+# 1. Check deployment summary
+terraform output deployment_summary
 
-# Check encryption
-aws s3api get-bucket-encryption --bucket $BUCKET_NAME
+# Should show:
+# phase_1_ready = true
+# cloudtrail_cis_3_1_compliant = true
+# cloudtrail_cis_3_2_compliant = true
+# config_recorder_enabled = true
+# config_rules_deployed = 8
 
-# Check public access blocks
-aws s3api get-public-access-block --bucket $BUCKET_NAME
+# 2. Verify CloudTrail is logging
+TRAIL_NAME=$(terraform output -raw cloudtrail_trail_name)
+aws cloudtrail get-trail-status --name "$TRAIL_NAME" --region eu-west-1 \
+  --query 'IsLogging' --output text
+# Expected: true
 
-# Check bucket policy
-aws s3api get-bucket-policy --bucket $BUCKET_NAME --query Policy --output text
+# 3. Verify Config recorder is running
+RECORDER_NAME=$(terraform output -raw config_recorder_name)
+aws configservice describe-configuration-recorder-status \
+  --configuration-recorder-names "$RECORDER_NAME" \
+  --region eu-west-1 \
+  --query 'ConfigurationRecordersStatus[0].recording' \
+  --output text
+# Expected: true
+
+# 4. Verify KMS key rotation
+KMS_KEY_ARN=$(terraform output -raw kms_key_arn)
+aws kms get-key-rotation-status --key-id "$KMS_KEY_ARN" --region eu-west-1
+# Expected: KeyRotationEnabled: true
+
+# 5. Test CloudTrail is capturing IAM events
+aws iam list-users --region eu-west-1
+# Wait 2-3 minutes, then check CloudTrail:
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=ListUsers \
+  --region eu-west-1 --max-results 1
+# Should show recent ListUsers event
 ```
 
 ---
 
 ## 📊 Performance Metrics
 
-| Metric                     | Value         | Comparison                  |
-| -------------------------- | ------------- | --------------------------- |
-| **Deployment Time**        | 45-60 seconds | vs. 20+ minutes manual      |
-| **Security Controls**      | 6 automatic   | vs. 0-2 typical manual      |
-| **Lines of Code**          | ~150 lines    | Manages 6 resources         |
-| **Repeatability**          | 100%          | vs. ~60% manual consistency |
-| **Cost per Bucket**        | $0.023/month  | (empty bucket)              |
-| **Engineering Time Saved** | 80-90%        | Automation vs. manual       |
+### Phase 1 Detection Baseline
+
+| Metric | Dev Environment | Production Ready |
+|--------|-----------------|------------------|
+| **Deployment Time** | 2-3 minutes | 3-5 minutes (with optional features) |
+| **Resources Deployed** | 47 resources | 50+ resources |
+| **Terraform Modules** | 3 (Foundation, CloudTrail, Config) | Same |
+| **CIS Controls** | 8 automated rules | Same + custom rules |
+| **Security Layers** | 11 controls | 11+ controls |
+| **Monthly Cost (Dev)** | ~$6-7 | ~$50-80 (with CloudWatch/Insights) |
+| **Lines of Terraform** | ~1,200 lines | Same codebase |
+| **Repeatability** | 100% deterministic | 100% deterministic |
+| **Manual Setup Time** | 2-4 hours | 8+ hours |
+| **Engineering Time Saved** | 95%+ | 95%+ |
+
+### Cost Breakdown (Dev Environment)
+
+| Service | Monthly Cost | Notes |
+|---------|--------------|-------|
+| CloudTrail | $2.00 | First trail free, management events only |
+| AWS Config | $2.00 | First 1000 config items free |
+| Config Rules (8) | $1.60 | $0.20 per rule × 8 |
+| S3 Storage | <$1.00 | Minimal logs in dev |
+| KMS CMK | $1.00 | 1 customer-managed key |
+| **Total** | **~$6-7/month** | Full CIS-compliant detection baseline |
+
+**Optional features** (disabled in dev to reduce costs):
+- CloudWatch Logs: +$10-20/month
+- SNS Notifications: +$0.50/month
+- CloudTrail Insights: +$35-50/month
+- S3 Data Events: +$100s/month (high-volume)
 
 ---
 
@@ -413,104 +573,199 @@ terraform force-unlock <LOCK_ID>
 
 ## 🎓 Educational Value
 
-### **What This Demo Teaches**
+### **What This Project Teaches**
 
 1. **Infrastructure as Code Principles**
-
-   - Declarative vs. imperative configuration
-   - State management
-   - Idempotency
+   - Declarative configuration with Terraform HCL
+   - State management and backend configuration
+   - Idempotency and deterministic deployments
+   - Module composition and reusability
+   - Dependency management (explicit `depends_on` vs implicit)
 
 2. **Cloud Security Best Practices**
+   - Defense in depth (multiple security layers)
+   - Encryption at rest (KMS) and in transit (HTTPS)
+   - Principle of least privilege (IAM policies)
+   - Security by default, optional features opt-in
+   - CIS AWS Foundations Benchmark compliance
+   - Audit logging and compliance monitoring
 
-   - Defense in depth
-   - Encryption at rest and in transit
-   - Principle of least privilege
-   - Public access prevention
+3. **AWS Security Services**
+   - **AWS CloudTrail**: API logging, multi-region trails, log validation
+   - **AWS Config**: Resource compliance, managed rules, remediation
+   - **AWS KMS**: Customer-managed keys, key rotation, encryption contexts
+   - **S3 Security**: Bucket policies, encryption, versioning, lifecycle
 
-3. **DevOps Automation**
+4. **Terraform Advanced Concepts**
+   - Module design patterns (foundation, service modules)
+   - Variable validation and type constraints
+   - Dynamic blocks and conditional resources
+   - Structured outputs and complex objects
+   - Data sources for runtime information
+   - Count and for_each for conditional creation
 
-   - Continuous deployment
-   - Automated testing
-   - GitOps workflows
-
-4. **Terraform Core Concepts**
-   - Resources and data sources
-   - Modules and composition
-   - Variables and outputs
-   - Provider configuration
+5. **DevOps/GitOps Workflows**
+   - Version-controlled infrastructure
+   - Peer review via pull requests
+   - Automated validation (terraform fmt/validate)
+   - Documentation as code
+   - Environment promotion (dev → staging → prod)
 
 ### **Skills Demonstrated**
 
-- ✅ Cloud infrastructure management
-- ✅ Security automation
-- ✅ Scripting and automation (PowerShell)
-- ✅ Version control (Git)
-- ✅ AWS services knowledge
-- ✅ Terraform proficiency
-- ✅ DevOps practices
+- ✅ Production-grade Terraform module development
+- ✅ AWS security services integration
+- ✅ CIS compliance automation
+- ✅ Cost optimization strategies
+- ✅ Security-first architecture design
+- ✅ Comprehensive technical documentation
+- ✅ Testing and verification methodologies
+- ✅ Git workflow and version control
 
 ---
 
 ## 🗺️ Roadmap
 
-### **Current: Phase 1 - Secure Storage** ✅
+### **Phase 1: Detection Baseline** ✅ **COMPLETE**
 
-- S3 bucket with security best practices
-- Automated deployment and cleanup
-- Verification tooling
+**Status:** Production-ready, CIS AWS Foundations compliant
 
-### **Future Phases**
+**What's Included:**
+- ✅ Foundation module (KMS + S3 buckets with encryption/versioning/lifecycle)
+- ✅ CloudTrail module (multi-region trail, log validation, KMS encryption)
+- ✅ AWS Config module (recorder + 8 CIS compliance rules)
+- ✅ Complete documentation (README, CHANGES_SUMMARY, VERIFICATION_CHECKLIST)
+- ✅ Dev environment configured and validated
+- ✅ Cost-optimized for dev (~$7/month)
+- ✅ Production-ready optional features (CloudWatch, SNS, Insights)
 
-#### **Phase 2 - Security Monitoring**
+**CIS Controls Implemented:**
+- CIS 3.1: Multi-region CloudTrail
+- CIS 3.2: Log file validation
+- CIS 3.3: CloudTrail KMS encryption
+- CIS 3.6: S3 access logging
+- CIS 3.7: Dedicated CloudTrail bucket
 
-- AWS CloudTrail integration
-- AWS Config rules
-- Real-time compliance checking
-- Security event logging
+---
 
-#### **Phase 3 - Threat Detection**
+### **Phase 2: Threat Detection** 🔄 **PLANNED**
 
-- AWS GuardDuty integration
-- Anomaly detection
-- Security alerting (SNS/Email)
-- EventBridge event routing
+**Goal:** Add real-time threat detection and anomaly analysis
 
-#### **Phase 4 - Automated Remediation**
+**Components:**
+- AWS GuardDuty (threat intelligence, anomaly detection)
+- Amazon Detective (security investigation)
+- VPC Flow Logs (network traffic analysis)
+- GuardDuty findings → EventBridge → SNS
+- GuardDuty S3 protection
+- GuardDuty EKS/ECS protection (if applicable)
 
-- Lambda-based auto-remediation
-- Security incident response
-- Automatic policy enforcement
-- Compliance drift correction
+**CIS Controls:**
+- CIS 4.x: VPC and network monitoring
 
-#### **Phase 5 - IAM Policy Analysis**
+---
 
-- IAM Access Analyzer integration
-- Policy risk scoring
-- Least privilege recommendations
-- Access pattern analysis
+### **Phase 3: Centralized Security** 🔄 **PLANNED**
+
+**Goal:** Unified security posture management and compliance reporting
+
+**Components:**
+- AWS Security Hub (aggregated findings from GuardDuty, Config, IAM Access Analyzer)
+- Security standards (CIS AWS Foundations, AWS Foundational Security Best Practices)
+- Custom Config rules for organization-specific policies
+- EventBridge integration for automated ticketing
+- Security Hub → SNS → Slack/Teams/Email
+
+**Deliverables:**
+- Single pane of glass for security findings
+- Automated compliance reporting
+- Security score tracking
+
+---
+
+### **Phase 4: IAM Governance** 🔄 **PLANNED**
+
+**Goal:** Least-privilege IAM and identity security
+
+**Components:**
+- IAM Access Analyzer (external access detection, unused access)
+- IAM credential reports
+- IAM password policy enforcement (Config rule)
+- MFA enforcement (Config rules)
+- IAM role trust policy analysis
+- Service Control Policies (SCPs) for AWS Organizations
+
+**CIS Controls:**
+- CIS 1.x: IAM controls (password policy, MFA, access keys, root account)
+
+---
+
+### **Phase 5: Automated Remediation** 🔄 **PLANNED**
+
+**Goal:** Auto-remediate non-compliant resources
+
+**Components:**
+- AWS Config remediation actions (SSM Automation documents)
+- Lambda-based custom remediation
+- EventBridge rules for real-time response
+- SNS notifications for remediation actions
+- Audit trail of all automated changes
+
+**Example Remediations:**
+- Auto-enable S3 encryption on non-compliant buckets
+- Auto-enable CloudTrail if disabled
+- Auto-revoke overly permissive security group rules
+- Auto-rotate IAM access keys > 90 days old
+
+---
+
+### **Phase 6: Multi-Account Governance** 🔄 **FUTURE**
+
+**Goal:** Organization-wide security baseline
+
+**Components:**
+- AWS Organizations integration
+- Organization CloudTrail
+- Centralized Config aggregator
+- Cross-account Security Hub
+- StackSets for baseline deployment
+- Service Control Policies (SCPs)
+
+**Deliverables:**
+- Single security baseline across all accounts
+- Centralized logging and compliance
+- Automated account provisioning with security controls
 
 ---
 
 ## 📚 Additional Resources
 
-### **Documentation**
+### **AWS Security Documentation**
+
+- [CIS AWS Foundations Benchmark v1.5.0](https://www.cisecurity.org/benchmark/amazon_web_services)
+- [AWS CloudTrail User Guide](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/)
+- [AWS Config Developer Guide](https://docs.aws.amazon.com/config/latest/developerguide/)
+- [AWS KMS Developer Guide](https://docs.aws.amazon.com/kms/latest/developerguide/)
+- [AWS Security Best Practices](https://aws.amazon.com/architecture/security-identity-compliance/)
+
+### **Terraform Documentation**
 
 - [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [AWS S3 Best Practices](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html)
-- [Terraform Module Best Practices](https://www.terraform.io/docs/language/modules/develop/index.html)
-
-### **Learning Materials**
-
+- [Terraform Module Best Practices](https://developer.hashicorp.com/terraform/language/modules/develop)
 - [HashiCorp Learn - Terraform](https://learn.hashicorp.com/terraform)
-- [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)
-- [Infrastructure as Code Principles](https://infrastructure-as-code.com/)
+
+### **Project Documentation**
+
+- [Foundation Module README](terraform/modules/foundation/README.md)
+- [CloudTrail Module README](terraform/modules/cloudtrail/README.md)
+- [Config Module README](terraform/modules/config/README.md)
+- [Environment Verification Checklist](terraform/environments/dev/VERIFICATION_CHECKLIST.md)
 
 ### **Tools & Extensions**
 
-- VS Code Terraform Extension
-- AWS Toolkit for VS Code
-- Terraform LSP (Language Server)
+- [VS Code Terraform Extension](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform)
+- [AWS Toolkit for VS Code](https://marketplace.visualstudio.com/items?itemName=AmazonWebServices.aws-toolkit-vscode)
+- [terraform-docs](https://github.com/terraform-docs/terraform-docs) - Generate documentation from Terraform modules
 
 ---
 
@@ -536,9 +791,9 @@ This project is created for educational and demonstration purposes.
 
 **Roko Skugor**
 
-- Project: IAM-Secure-Gate Demo
-- Purpose: Commission Demonstration
-- Date: November 2025
+- Project: IaC-Secure-Gate - AWS Security Baseline
+- Purpose: Production-grade cloud security infrastructure
+- Phase 1 Completed: January 2026
 
 ---
 
@@ -560,26 +815,56 @@ For questions about this demo:
 
 ---
 
-## 🎯 Demo Success Criteria
+## 🎯 Phase 1 Success Criteria
 
-This demo is successful when:
+Phase 1 Detection Baseline is successful when:
 
-- ✅ Infrastructure deploys in under 60 seconds
-- ✅ All 6 security controls are verified
-- ✅ Resources are accessible in AWS Console
+- ✅ All 3 modules deploy cleanly (Foundation, CloudTrail, Config)
+- ✅ CloudTrail is logging and multi-region enabled
+- ✅ CloudTrail log validation enabled (CIS 3.2)
+- ✅ All logs encrypted with KMS CMK
+- ✅ AWS Config recorder is running
+- ✅ All 8 CIS Config rules are ACTIVE
+- ✅ `terraform apply` is idempotent (second apply shows no changes)
+- ✅ `deployment_summary` shows `phase_1_ready = true`
+- ✅ All CIS compliance flags = true
+- ✅ Resources accessible and verifiable in AWS Console
 - ✅ Cleanup removes all resources completely
-- ✅ Process is reproducible and consistent
+- ✅ Total cost < $10/month for dev environment
 
 ---
 
 ## 📈 Version History
 
-### **v1.0.0 - Demo Release**
+### **v2.0.0 - Phase 1 Complete** (January 2026)
+
+**Major Features:**
+- ✅ Foundation module (KMS + S3 buckets)
+- ✅ CloudTrail module v2.0 (production-grade, advanced event selectors)
+- ✅ AWS Config module (8 CIS compliance rules)
+- ✅ Complete dev environment integration
+- ✅ CIS AWS Foundations Benchmark compliance
+- ✅ Comprehensive documentation suite
+
+**Breaking Changes:**
+- CloudTrail module: `kms_key_id` → `kms_key_arn`
+- Removed `region` and `account_id` variables (auto-detected)
+- Migrated from legacy `event_selector` to `advanced_event_selector`
+
+**Infrastructure:**
+- 47 resources deployed in Phase 1
+- 11 security layers
+- 8 automated CIS compliance rules
+- ~$6-7/month dev cost
+
+---
+
+### **v1.0.0 - Demo Release** (November 2025)
 
 - Initial demo version
 - Single S3 bucket deployment
 - Core security features
 - PowerShell automation scripts
-- Verification tooling
+- Basic verification tooling
 
 ---
