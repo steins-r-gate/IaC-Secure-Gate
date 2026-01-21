@@ -51,6 +51,7 @@ resource "aws_config_delivery_channel" "main" {
   name           = "${local.config_name}-delivery"
   s3_bucket_name = var.config_bucket_name
   s3_key_prefix  = var.s3_key_prefix
+  s3_kms_key_arn = var.config_bucket_kms_key_arn
   sns_topic_arn  = local.sns_topic_arn
 
   snapshot_delivery_properties {
@@ -92,7 +93,7 @@ resource "aws_sns_topic" "config" {
 
   name              = "${local.config_name}-notifications"
   display_name      = "AWS Config notifications for ${var.environment}"
-  kms_master_key_id = var.config_bucket_kms_key_arn
+  kms_master_key_id = var.config_bucket_kms_key_arn != "" ? var.config_bucket_kms_key_arn : null
 
   tags = merge(local.config_tags, {
     Name = "${local.config_name}-notifications"

@@ -40,7 +40,7 @@ resource "aws_iam_role" "config" {
 
 resource "aws_iam_role_policy_attachment" "config" {
   role       = aws_iam_role.config.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/ConfigRole"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWS_ConfigRole"
 }
 
 # ==================================================================
@@ -91,8 +91,6 @@ resource "aws_iam_role_policy" "config_s3" {
 # ==================================================================
 
 data "aws_iam_policy_document" "config_kms" {
-  count = var.config_bucket_kms_key_arn != null ? 1 : 0
-
   statement {
     sid    = "ConfigKMSPermissions"
     effect = "Allow"
@@ -105,9 +103,7 @@ data "aws_iam_policy_document" "config_kms" {
 }
 
 resource "aws_iam_role_policy" "config_kms" {
-  count = var.config_bucket_kms_key_arn != null ? 1 : 0
-
   name   = "${local.config_name}-kms-policy"
   role   = aws_iam_role.config.id
-  policy = data.aws_iam_policy_document.config_kms[0].json
+  policy = data.aws_iam_policy_document.config_kms.json
 }

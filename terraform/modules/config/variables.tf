@@ -61,11 +61,11 @@ variable "config_bucket_arn" {
 variable "config_bucket_kms_key_arn" {
   description = "ARN of the KMS key used for S3 bucket encryption (required if bucket uses SSE-KMS)"
   type        = string
-  default     = null
+  default     = ""
 
   validation {
-    condition     = var.config_bucket_kms_key_arn == null || can(regex("^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:key/[a-f0-9-]+$", var.config_bucket_kms_key_arn))
-    error_message = "Must be a valid KMS key ARN or null."
+    condition     = var.config_bucket_kms_key_arn == "" || can(regex("^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:key/[a-f0-9-]+$", var.config_bucket_kms_key_arn))
+    error_message = "Must be a valid KMS key ARN or empty string."
   }
 }
 

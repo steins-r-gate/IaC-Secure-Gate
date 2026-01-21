@@ -131,3 +131,74 @@ module "config" {
     module.foundation
   ]
 }
+
+# ==================================================================
+# IAM Access Analyzer Module (External Access Detection)
+# No dependencies - standalone service
+# ==================================================================
+
+module "access_analyzer" {
+  source = "../../modules/access-analyzer"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Analyzer configuration
+  analyzer_type = "ACCOUNT" # Single account scope for Phase 1
+
+  # Archive rule (auto-archive old findings)
+  enable_archive_rule              = true
+  archive_findings_older_than_days = 90 # Dev: 90 days (Prod: 365 days)
+
+  # Optional: SNS notifications (disabled by default to save costs)
+  enable_sns_notifications = false
+  kms_key_arn              = module.foundation.kms_key_arn # If notifications enabled
+  sns_email_subscriptions  = []                            # Add emails if notifications enabled
+
+  # No dependencies - standalone service
+}
+
+# ==================================================================
+# Security Hub Module (Centralized Security Findings)
+# Depends on detection services being enabled for proper integration
+# ==================================================================
+
+module "security_hub" {
+  source = "../../modules/security-hub"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Standards configuration
+  enable_cis_standard           = true
+  cis_standard_version          = "1.4.0" # Stable version with 25 controls
+  enable_foundational_standard  = true
+  foundational_standard_version = "1.0.0" # 200+ controls
+
+  # Product integrations
+  enable_config_integration          = true
+  enable_access_analyzer_integration = true
+
+  # Multi-region aggregation (disabled for Phase 1 single-region)
+  enable_finding_aggregation = false
+
+  # Optional: Disable noisy controls in dev (empty set = all enabled)
+  disabled_control_ids = [
+    # Example: Uncomment to disable specific controls
+    # "cis-aws-foundations-benchmark/v/1.4.0/1.1", # Root account MFA
+  ]
+
+  # Optional: SNS for critical findings (disabled to save costs)
+  enable_critical_finding_notifications = false
+  kms_key_arn                           = module.foundation.kms_key_arn
+  sns_email_subscriptions               = []
+
+  # CRITICAL: Depends on detection services being enabled
+  # Security Hub integrations require these services to be active
+  depends_on = [
+    module.config,
+    module.access_analyzer
+  ]
+}
