@@ -155,7 +155,7 @@ output "security_hub_enabled_standards" {
 
 output "security_hub_control_count" {
   description = "Total Security Hub controls available"
-  value       = module.security_hub.control_configuration.total_controls_available
+  value       = try(module.security_hub.control_configuration.total_controls_available, 0)
 }
 
 output "security_hub_summary" {
@@ -204,22 +204,22 @@ output "deployment_summary" {
     kms_key_arn              = module.foundation.kms_key_arn
     cloudtrail_bucket        = module.foundation.cloudtrail_bucket_name
     config_bucket            = module.foundation.config_bucket_name
-    foundation_cis_compliant = module.foundation.foundation_summary.cis_compliant
+    foundation_cis_compliant = try(module.foundation.foundation_summary.cis_compliant, false)
 
     # CloudTrail
     cloudtrail_name                  = module.cloudtrail.trail_name
     cloudtrail_multi_region          = module.cloudtrail.is_multi_region_trail
     cloudtrail_log_validation        = module.cloudtrail.log_file_validation_enabled
     cloudtrail_global_service_events = module.cloudtrail.include_global_service_events
-    cloudtrail_cis_3_1_compliant     = module.cloudtrail.cloudtrail_summary.cis_3_1_compliant
-    cloudtrail_cis_3_2_compliant     = module.cloudtrail.cloudtrail_summary.cis_3_2_compliant
+    cloudtrail_cis_3_1_compliant     = try(module.cloudtrail.cloudtrail_summary.cis_3_1_compliant, false)
+    cloudtrail_cis_3_2_compliant     = try(module.cloudtrail.cloudtrail_summary.cis_3_2_compliant, false)
 
     # Config
     config_recorder_name    = module.config.config_recorder_name
     config_recorder_enabled = module.config.recorder_status_enabled
     config_rules_deployed   = module.config.config_rules_count
-    config_primary_region   = module.config.configuration_summary.is_primary_region
-    config_global_resources = module.config.configuration_summary.include_global_resource_types
+    config_primary_region   = try(module.config.configuration_summary.is_primary_region, true)
+    config_global_resources = try(module.config.configuration_summary.include_global_resource_types, false)
 
     # Access Analyzer
     access_analyzer_enabled = true
@@ -229,7 +229,7 @@ output "deployment_summary" {
     # Security Hub
     security_hub_enabled       = true
     security_hub_standards     = module.security_hub.enabled_standards
-    security_hub_control_count = module.security_hub.control_configuration.total_controls_available
+    security_hub_control_count = try(module.security_hub.control_configuration.total_controls_available, 0)
 
     # Compliance Status
     phase_1_ready    = true
