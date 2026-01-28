@@ -15,30 +15,46 @@ format_time() {
     printf "%02d:%02d (mm:ss)" $((seconds/60)) $((seconds%60))
 }
 
-# Scenario 1: IAM User Without MFA (Console Access)
-echo -e "\n[Scenario 1] IAM User Without MFA (Console Access)" | tee -a $RESULTS_FILE
-echo "Creating test IAM user with console access..." | tee -a $RESULTS_FILE
+# Scenario 1: S3 Bucket with Public Read Access (Config Detection)
+echo -e "\n[Scenario 1] S3 Bucket with Public Read Access (Config Detection)" | tee -a $RESULTS_FILE
+echo "Creating S3 bucket with public read policy..." | tee -a $RESULTS_FILE
 TEST1_START=$(date +%s)
-USER_OUTPUT=$(aws iam create-user --user-name test-no-mfa-user --tags Key=Test,Value=Phase1Validation)
-USER_ID=$(echo "$USER_OUTPUT" | grep -o '"UserId": "[^"]*"' | cut -d'"' -f4)
+BUCKET1_NAME="iac-secure-gate-test-config-$(date +%s)"
 
-echo "User ID: $USER_ID" | tee -a $RESULTS_FILE
-echo "Creating console login profile..." | tee -a $RESULTS_FILE
-aws iam create-login-profile --user-name test-no-mfa-user --password "TempPass123!$(date +%s)" --no-password-reset-required
+aws s3api create-bucket --bucket "$BUCKET1_NAME" --region $REGION --create-bucket-configuration LocationConstraint=$REGION
+aws s3api delete-public-access-block --bucket "$BUCKET1_NAME"
 
-echo "Waiting 60 seconds for Config to record the resource..." | tee -a $RESULTS_FILE
-sleep 60
+# Create public read policy
+cat > scripts/temp-config-bucket-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicRead",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::$BUCKET1_NAME/*"
+    }
+  ]
+}
+EOF
+
+aws s3api put-bucket-policy --bucket "$BUCKET1_NAME" --policy file://scripts/temp-config-bucket-policy.json
+
+echo "Waiting 30 seconds for Config to record the resource..." | tee -a $RESULTS_FILE
+sleep 30
 
 echo "Triggering Config rule evaluation..." | tee -a $RESULTS_FILE
-aws configservice start-config-rules-evaluation --config-rule-names iam-user-mfa-enabled --region $REGION
+aws configservice start-config-rules-evaluation --config-rule-names s3-bucket-public-read-prohibited --region $REGION
 
 echo "Waiting for Config detection (checking every 30 seconds)..." | tee -a $RESULTS_FILE
 while true; do
-  # Check Config rule compliance using UserId
+  # Check Config rule compliance for the bucket
   NON_COMPLIANT=$(aws configservice get-compliance-details-by-config-rule \
-    --config-rule-name iam-user-mfa-enabled \
+    --config-rule-name s3-bucket-public-read-prohibited \
     --region $REGION \
-    --query "EvaluationResults[?EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId=='$USER_ID'].ComplianceType" \
+    --query "EvaluationResults[?EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId=='$BUCKET1_NAME'].ComplianceType" \
     --output text 2>/dev/null || echo "")
 
   if [ "$NON_COMPLIANT" == "NON_COMPLIANT" ]; then
@@ -51,9 +67,9 @@ while true; do
   ELAPSED=$(($(date +%s) - TEST1_START))
   echo "  ⏳ Still waiting... (${ELAPSED}s elapsed)"
 
-  # Timeout after 7 minutes
-  if [ $ELAPSED -gt 420 ]; then
-    echo "❌ TIMEOUT: No detection after 7 minutes" | tee -a $RESULTS_FILE
+  # Timeout after 5 minutes
+  if [ $ELAPSED -gt 300 ]; then
+    echo "❌ TIMEOUT: No detection after 5 minutes" | tee -a $RESULTS_FILE
     TEST1_MTTD="TIMEOUT"
     break
   fi
@@ -61,9 +77,10 @@ while true; do
   sleep 30
 done
 
-echo "Cleaning up test user..." | tee -a $RESULTS_FILE
-aws iam delete-login-profile --user-name test-no-mfa-user 2>/dev/null || true
-aws iam delete-user --user-name test-no-mfa-user
+echo "Cleaning up test bucket..." | tee -a $RESULTS_FILE
+aws s3api delete-bucket-policy --bucket "$BUCKET1_NAME" 2>/dev/null || true
+aws s3api delete-bucket --bucket "$BUCKET1_NAME" 2>/dev/null || true
+rm -f scripts/temp-config-bucket-policy.json
 echo "" | tee -a $RESULTS_FILE
 
 # Scenario 2: Wildcard IAM Policy
@@ -180,8 +197,8 @@ echo -e "\n=====================================================" | tee -a $RESU
 echo "PHASE 1 TESTING SUMMARY" | tee -a $RESULTS_FILE
 echo "=====================================================" | tee -a $RESULTS_FILE
 echo "" | tee -a $RESULTS_FILE
-echo "Scenario 1 (IAM User With Console Access, No MFA):" | tee -a $RESULTS_FILE
-echo "  Expected MTTD: 1-5 minutes (with manual trigger)" | tee -a $RESULTS_FILE
+echo "Scenario 1 (S3 Bucket Public Read - Config):" | tee -a $RESULTS_FILE
+echo "  Expected MTTD: 1-3 minutes" | tee -a $RESULTS_FILE
 echo "  Actual MTTD:   $TEST1_MTTD seconds" | tee -a $RESULTS_FILE
 echo "" | tee -a $RESULTS_FILE
 echo "Scenario 2 (Wildcard IAM Policy):" | tee -a $RESULTS_FILE
@@ -200,8 +217,8 @@ echo "=====================================================" | tee -a $RESULTS_F
 echo -e "\nSUCCESS CRITERIA CHECK:" | tee -a $RESULTS_FILE
 ALL_PASSED=true
 
-if [ "$TEST1_MTTD" != "TIMEOUT" ] && [ "$TEST1_MTTD" -lt 300 ]; then
-  echo "✅ Scenario 1: PASSED (MTTD < 5 min)" | tee -a $RESULTS_FILE
+if [ "$TEST1_MTTD" != "TIMEOUT" ] && [ "$TEST1_MTTD" -lt 180 ]; then
+  echo "✅ Scenario 1: PASSED (MTTD < 3 min)" | tee -a $RESULTS_FILE
 else
   echo "❌ Scenario 1: FAILED" | tee -a $RESULTS_FILE
   ALL_PASSED=false
