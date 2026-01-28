@@ -63,9 +63,9 @@ module "foundation" {
   project_name = local.project_name
   common_tags  = local.common_tags
 
-  # Retention settings (can override defaults)
-  cloudtrail_log_retention_days  = 90  # CIS requirement
-  config_snapshot_retention_days = 365 # Annual compliance
+  # Retention settings (configured via variables)
+  cloudtrail_log_retention_days  = var.cloudtrail_log_retention_days
+  config_snapshot_retention_days = var.config_snapshot_retention_days
 }
 
 # CloudTrail Module (Audit Logging)
@@ -149,7 +149,7 @@ module "access_analyzer" {
 
   # Archive rule (auto-archive old findings)
   enable_archive_rule              = true
-  archive_findings_older_than_days = 90 # Dev: 90 days (Prod: 365 days)
+  archive_findings_older_than_days = var.archive_findings_older_than_days
 
   # Optional: SNS notifications (disabled by default to save costs)
   enable_sns_notifications = false
@@ -173,7 +173,7 @@ module "security_hub" {
 
   # Standards configuration
   enable_cis_standard           = true
-  cis_standard_version          = "1.4.0" # Stable version with 25 controls
+  cis_standard_version          = var.cis_standard_version
   enable_foundational_standard  = true
   foundational_standard_version = "1.0.0" # 200+ controls
 

@@ -25,7 +25,8 @@ resource "aws_cloudwatch_log_group" "cloudtrail" {
 
   name              = "/aws/cloudtrail/${local.trail_name}"
   retention_in_days = var.cloudwatch_log_retention_days
-  kms_key_id        = var.kms_key_arn
+  # Extract key ID from ARN: arn:aws:kms:region:account:key/KEY_ID
+  kms_key_id        = can(regex("^arn:aws:kms:", var.kms_key_arn)) ? regex("[^/]+$", var.kms_key_arn) : var.kms_key_arn
 
   tags = merge(local.cloudtrail_tags, {
     Name = "${local.trail_name}-logs"
@@ -165,7 +166,7 @@ resource "aws_cloudtrail" "main" {
       for_each = var.exclude_management_event_sources
       content {
         field      = "eventSource"
-        not_equals = var.exclude_management_event_sources
+        not_equals = [field_selector.value]
       }
     }
   }

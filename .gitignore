@@ -69,3 +69,10 @@ aws-env.ps1
 
 # Claude Code
 .claude/
+
+# Testing artifacts
+PHASE1-TESTING-RESULTS-*.txt
+scripts/test-*.json
+scripts/temp-*.json
+*-test-results-*.txt
+*.test.json
