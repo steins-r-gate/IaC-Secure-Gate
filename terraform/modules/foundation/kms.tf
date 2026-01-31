@@ -50,6 +50,7 @@ data "aws_iam_policy_document" "kms_key_policy" {
 
   # Statement 2: Allow CloudTrail to encrypt logs
   # CRITICAL: Must include encryption context condition for security
+  # NOTE: Multi-region trail requires access from ALL regions, not just home region
   statement {
     sid    = "Allow CloudTrail to encrypt logs"
     effect = "Allow"
@@ -65,20 +66,12 @@ data "aws_iam_policy_document" "kms_key_policy" {
 
     # SECURITY: Encryption context ensures only YOUR CloudTrail can use this key
     # Prevents cross-account misuse
+    # Uses wildcard for region (*) to support multi-region trail
     condition {
       test     = "StringLike"
       variable = "kms:EncryptionContext:aws:cloudtrail:arn"
       values = [
-        "arn:aws:cloudtrail:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:trail/*"
-      ]
-    }
-
-    # SECURITY: Ensure CloudTrail calls are authenticated from your account
-    condition {
-      test     = "StringEquals"
-      variable = "kms:ViaService"
-      values = [
-        "cloudtrail.${data.aws_region.current.id}.amazonaws.com"
+        "arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"
       ]
     }
   }
