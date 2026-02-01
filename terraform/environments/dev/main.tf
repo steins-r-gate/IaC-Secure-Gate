@@ -1,5 +1,5 @@
 # ==================================================================
-# Phase 1 - Development Environment
+# Phase 1 & 2 - Development Environment
 # terraform/environments/dev/main.tf
 # ==================================================================
 
@@ -10,6 +10,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
     }
   }
 
@@ -40,11 +44,11 @@ data "aws_region" "current" {}
 
 locals {
   environment  = "dev"
-  project_name = "iam-secure-gate"
+  project_name = "iam-secure-gate" # Keep original name for backward compatibility
 
   common_tags = {
-    Project     = "IAM-Secure-Gate"
-    Phase       = "Phase-1-Detection"
+    Project     = "IaC-Secure-Gate"
+    Phase       = "Phase-1-2"
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
@@ -201,4 +205,105 @@ module "security_hub" {
     module.config,
     module.access_analyzer
   ]
+}
+
+# ==================================================================
+# Phase 2 Modules
+# ==================================================================
+
+# Lambda Remediation Module (Automated Fixes)
+# Triggered by EventBridge when Security Hub detects violations
+module "lambda_remediation" {
+  source = "../../modules/lambda-remediation"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Lambda configuration
+  lambda_runtime            = "python3.12"
+  lambda_timeout            = 30
+  lambda_memory_size        = 256
+  lambda_log_retention_days = 30
+
+  # Feature flags - all enabled
+  enable_iam_remediation   = true
+  enable_s3_remediation    = true
+  enable_sg_remediation    = true
+  enable_dead_letter_queue = true
+
+  # DRY RUN MODE: Set to true for safe testing (logs but doesn't modify)
+  # IMPORTANT: Set to false for production remediation
+  dry_run_mode = true
+
+  # KMS encryption for Lambda environment variables
+  # Note: Disabled because foundation KMS key policy blocks direct Lambda decrypt
+  # Environment variables contain only config (no secrets), so this is acceptable
+  kms_key_arn = null
+
+  # DynamoDB for audit trail (configured via remediation_tracking module)
+  dynamodb_table_name = module.remediation_tracking.table_name
+  dynamodb_table_arn  = module.remediation_tracking.table_arn
+
+  # SNS will be configured in Week 3
+  sns_topic_arn = ""
+
+  # Depends on Security Hub for findings
+  depends_on = [
+    module.security_hub
+  ]
+}
+
+# EventBridge Remediation Module (Routes findings to Lambdas)
+# Connects Security Hub findings to appropriate Lambda functions
+module "eventbridge_remediation" {
+  source = "../../modules/eventbridge-remediation"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Lambda function ARNs from the remediation module
+  iam_remediation_lambda_arn = module.lambda_remediation.iam_remediation_function_arn
+  s3_remediation_lambda_arn  = module.lambda_remediation.s3_remediation_function_arn
+  sg_remediation_lambda_arn  = module.lambda_remediation.sg_remediation_function_arn
+
+  # Enable all rules
+  enable_iam_rule = true
+  enable_s3_rule  = true
+  enable_sg_rule  = true
+
+  # Retry configuration
+  retry_attempts            = 2
+  maximum_event_age_seconds = 3600 # 1 hour
+
+  depends_on = [
+    module.lambda_remediation
+  ]
+}
+
+# Remediation Tracking Module (DynamoDB for audit trail)
+# Stores all remediation actions for analytics and compliance
+module "remediation_tracking" {
+  source = "../../modules/remediation-tracking"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # DynamoDB configuration
+  billing_mode                  = "PAY_PER_REQUEST" # Cost-effective for variable workloads
+  enable_point_in_time_recovery = true              # Data protection
+  enable_dynamodb_stream        = true              # For Phase 3 real-time processing
+
+  # TTL for automatic cleanup (90 days)
+  ttl_enabled = true
+  ttl_days    = 90
+
+  # Global Secondary Indexes for efficient queries
+  enable_resource_index = true # Query by resource ARN
+  enable_status_index   = true # Query by remediation status
+
+  # Use AWS managed encryption (free)
+  kms_key_arn = null
 }
