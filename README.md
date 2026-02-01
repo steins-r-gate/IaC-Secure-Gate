@@ -14,6 +14,8 @@ This project implements a detection-first security architecture using AWS native
 - Multi-region audit logging with CloudTrail
 - Continuous compliance monitoring via AWS Config
 - Centralized security findings aggregation through Security Hub
+- **Automated remediation of security violations (Phase 2)**
+- **Real-time notifications and daily analytics reports (Phase 2)**
 - Cost-optimized implementation under 15 EUR/month
 - Deterministic infrastructure deployment with zero configuration drift
 
