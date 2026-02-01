@@ -242,8 +242,9 @@ module "lambda_remediation" {
   kms_key_arn = null
 
   # DynamoDB for audit trail (configured via remediation_tracking module)
-  dynamodb_table_name = module.remediation_tracking.table_name
-  dynamodb_table_arn  = module.remediation_tracking.table_arn
+  enable_dynamodb_logging = true
+  dynamodb_table_name     = module.remediation_tracking.table_name
+  dynamodb_table_arn      = module.remediation_tracking.table_arn
 
   # SNS will be configured in Week 3
   sns_topic_arn = ""

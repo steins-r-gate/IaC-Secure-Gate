@@ -86,6 +86,12 @@ variable "lambda_log_retention_days" {
 # DynamoDB Configuration (State Tracking)
 # ==================================================================
 
+variable "enable_dynamodb_logging" {
+  description = "Enable DynamoDB logging for remediation tracking (must be set explicitly)"
+  type        = bool
+  default     = false
+}
+
 variable "dynamodb_table_name" {
   description = "DynamoDB table name for remediation tracking"
   type        = string
@@ -96,11 +102,6 @@ variable "dynamodb_table_arn" {
   description = "DynamoDB table ARN for remediation tracking"
   type        = string
   default     = ""
-
-  validation {
-    condition     = var.dynamodb_table_arn == "" || can(regex("^arn:aws:dynamodb:[a-z0-9-]+:[0-9]{12}:table/[a-zA-Z0-9_.-]+$", var.dynamodb_table_arn))
-    error_message = "Must be a valid DynamoDB table ARN or empty string."
-  }
 }
 
 # ==================================================================

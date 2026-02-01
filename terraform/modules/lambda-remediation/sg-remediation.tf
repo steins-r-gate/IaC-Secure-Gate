@@ -201,7 +201,7 @@ resource "aws_iam_role_policy" "sg_remediation_kms" {
 # ==================================================================
 
 resource "aws_iam_role_policy" "sg_remediation_dynamodb" {
-  count = var.enable_sg_remediation && var.dynamodb_table_arn != "" ? 1 : 0
+  count = var.enable_sg_remediation && var.enable_dynamodb_logging ? 1 : 0
 
   name = "${local.sg_lambda_name}-dynamodb-policy"
   role = aws_iam_role.sg_remediation[0].id

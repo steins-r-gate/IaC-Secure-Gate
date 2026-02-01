@@ -144,7 +144,7 @@ output "remediation_summary" {
     ])
 
     # Integration Points
-    dynamodb_configured = var.dynamodb_table_arn != ""
+    dynamodb_configured = var.enable_dynamodb_logging
     sns_configured      = var.sns_topic_arn != ""
 
     # Cost Estimate (monthly, within free tier)

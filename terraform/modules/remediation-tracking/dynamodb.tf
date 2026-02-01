@@ -78,13 +78,8 @@ resource "aws_dynamodb_table" "remediation_history" {
   }
 
   # Enable DynamoDB Streams for Phase 3 (real-time processing)
-  dynamic "stream_specification" {
-    for_each = var.enable_dynamodb_stream ? [1] : []
-    content {
-      stream_enabled   = true
-      stream_view_type = var.stream_view_type
-    }
-  }
+  stream_enabled   = var.enable_dynamodb_stream
+  stream_view_type = var.enable_dynamodb_stream ? var.stream_view_type : null
 
   # TTL for automatic cleanup of old records
   ttl {

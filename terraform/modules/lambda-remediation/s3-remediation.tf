@@ -188,7 +188,7 @@ resource "aws_iam_role_policy" "s3_remediation_kms" {
 # ==================================================================
 
 resource "aws_iam_role_policy" "s3_remediation_dynamodb" {
-  count = var.enable_s3_remediation && var.dynamodb_table_arn != "" ? 1 : 0
+  count = var.enable_s3_remediation && var.enable_dynamodb_logging ? 1 : 0
 
   name = "${local.s3_lambda_name}-dynamodb-policy"
   role = aws_iam_role.s3_remediation[0].id

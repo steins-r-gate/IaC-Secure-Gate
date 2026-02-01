@@ -179,33 +179,36 @@ IAM Remediation Test:
 
 ---
 
-## Week 2: EventBridge & State Tracking
+## Week 2: EventBridge & State Tracking ✅ COMPLETE
 
-### Day 1-2: EventBridge Rules
-- [ ] Create `terraform/modules/eventbridge-remediation/` directory
-- [ ] Create `eventbridge-rules.tf`
-  - [ ] Rule for IAM wildcard findings
-  - [ ] Rule for S3 public bucket findings
-  - [ ] Rule for Security Group findings
-- [ ] Create `eventbridge-targets.tf`
-  - [ ] Connect each rule to its Lambda
-  - [ ] Configure input transformers (extract finding details)
-  - [ ] Set retry policy (2 retries, exponential backoff)
-- [ ] Deploy EventBridge module
+### Day 1-2: EventBridge Rules ✅
+- [x] Create `terraform/modules/eventbridge-remediation/` directory
+- [x] Create `eventbridge-rules.tf`
+  - [x] Rule for IAM wildcard findings (IAM.1, IAM.21)
+  - [x] Rule for S3 public bucket findings (S3.1-S3.19)
+  - [x] Rule for Security Group findings (EC2.2, EC2.18, EC2.19, EC2.21)
+- [x] Create `eventbridge-targets.tf` (integrated in rules.tf)
+  - [x] Connect each rule to its Lambda
+  - [x] Configure input transformers (extract finding details)
+  - [x] Set retry policy (2 retries, exponential backoff)
+- [x] Deploy EventBridge module ✅ SUCCESS
 
-### Day 3-4: DynamoDB State Tracking
-- [ ] Create `terraform/modules/remediation-tracking/` directory
-- [ ] Create `dynamodb.tf`
-  - [ ] Table: `iac-secure-gate-remediation-history`
-  - [ ] Partition key: violation_type
-  - [ ] Sort key: timestamp
-  - [ ] Enable DynamoDB Streams (for Phase 3)
-  - [ ] Enable TTL (90 days)
-  - [ ] Enable Point-in-Time Recovery
-- [ ] Create `cloudwatch-logs.tf`
-  - [ ] Log groups for each Lambda
-  - [ ] 30-day retention
-- [ ] Deploy tracking module
+### Day 3-4: DynamoDB State Tracking ✅
+- [x] Create `terraform/modules/remediation-tracking/` directory
+- [x] Create `dynamodb.tf`
+  - [x] Table: `iam-secure-gate-dev-remediation-history`
+  - [x] Partition key: violation_type
+  - [x] Sort key: timestamp
+  - [x] Enable DynamoDB Streams (for Phase 3)
+  - [x] Enable TTL (90 days)
+  - [x] Enable Point-in-Time Recovery
+  - [x] GSI: resource-arn-index (query by resource)
+  - [x] GSI: status-index (query by status)
+- [x] CloudWatch Log Groups (created in lambda-remediation module)
+  - [x] 30-day retention
+- [x] Deploy tracking module ✅ SUCCESS
+- [x] Lambda functions configured with DYNAMODB_TABLE env var
+- [x] DynamoDB IAM policies attached to Lambda roles
 
 ### Day 5-7: End-to-End Integration Testing
 - [ ] Test Scenario 1: IAM Wildcard

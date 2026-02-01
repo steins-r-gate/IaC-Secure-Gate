@@ -191,7 +191,7 @@ resource "aws_iam_role_policy" "iam_remediation_kms" {
 # ==================================================================
 
 resource "aws_iam_role_policy" "iam_remediation_dynamodb" {
-  count = var.enable_iam_remediation && var.dynamodb_table_arn != "" ? 1 : 0
+  count = var.enable_iam_remediation && var.enable_dynamodb_logging ? 1 : 0
 
   name = "${local.iam_lambda_name}-dynamodb-policy"
   role = aws_iam_role.iam_remediation[0].id
