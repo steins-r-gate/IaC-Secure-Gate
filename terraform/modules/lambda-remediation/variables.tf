@@ -108,15 +108,16 @@ variable "dynamodb_table_arn" {
 # SNS Configuration (Notifications)
 # ==================================================================
 
+variable "enable_sns_notifications" {
+  description = "Enable SNS notifications for remediation events (must be set explicitly)"
+  type        = bool
+  default     = false
+}
+
 variable "sns_topic_arn" {
   description = "SNS topic ARN for remediation notifications"
   type        = string
   default     = ""
-
-  validation {
-    condition     = var.sns_topic_arn == "" || can(regex("^arn:aws:sns:[a-z0-9-]+:[0-9]{12}:[a-zA-Z0-9_-]+$", var.sns_topic_arn))
-    error_message = "Must be a valid SNS topic ARN or empty string."
-  }
 }
 
 # ==================================================================

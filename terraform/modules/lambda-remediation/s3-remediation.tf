@@ -214,7 +214,7 @@ resource "aws_iam_role_policy" "s3_remediation_dynamodb" {
 # ==================================================================
 
 resource "aws_iam_role_policy" "s3_remediation_sns" {
-  count = var.enable_s3_remediation && var.sns_topic_arn != "" ? 1 : 0
+  count = var.enable_s3_remediation && var.enable_sns_notifications ? 1 : 0
 
   name = "${local.s3_lambda_name}-sns-policy"
   role = aws_iam_role.s3_remediation[0].id

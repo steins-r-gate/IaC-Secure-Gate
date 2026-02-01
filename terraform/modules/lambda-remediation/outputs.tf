@@ -145,7 +145,7 @@ output "remediation_summary" {
 
     # Integration Points
     dynamodb_configured = var.enable_dynamodb_logging
-    sns_configured      = var.sns_topic_arn != ""
+    sns_configured      = var.enable_sns_notifications
 
     # Cost Estimate (monthly, within free tier)
     monthly_cost_estimate = "$0.00 (Lambda free tier: 1M requests/month)"

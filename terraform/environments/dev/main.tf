@@ -246,8 +246,9 @@ module "lambda_remediation" {
   dynamodb_table_name     = module.remediation_tracking.table_name
   dynamodb_table_arn      = module.remediation_tracking.table_arn
 
-  # SNS will be configured in Week 3
-  sns_topic_arn = ""
+  # SNS notifications for remediation events
+  enable_sns_notifications = true
+  sns_topic_arn            = module.self_improvement.remediation_alerts_topic_arn
 
   # Depends on Security Hub for findings
   depends_on = [
@@ -307,4 +308,40 @@ module "remediation_tracking" {
 
   # Use AWS managed encryption (free)
   kms_key_arn = null
+}
+
+# Self-Improvement Module (SNS Notifications + Analytics)
+# Provides alerting and daily analytics reports
+module "self_improvement" {
+  source = "../../modules/self-improvement"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # SNS Topics - all enabled
+  enable_remediation_alerts   = true
+  enable_analytics_reports    = true
+  enable_manual_review_alerts = true
+
+  # Email subscriptions (will require confirmation)
+  alert_email_subscriptions = [var.owner_email]
+
+  # Analytics Lambda configuration
+  enable_analytics_lambda   = true
+  analytics_schedule        = "cron(0 2 * * ? *)" # Daily at 2 AM UTC
+  analytics_lambda_timeout  = 60
+  analytics_lambda_memory   = 256
+  lambda_log_retention_days = 30
+
+  # DynamoDB connection for analytics queries
+  dynamodb_table_name = module.remediation_tracking.table_name
+  dynamodb_table_arn  = module.remediation_tracking.table_arn
+
+  # Use AWS managed encryption for SNS
+  kms_key_arn = null
+
+  depends_on = [
+    module.remediation_tracking
+  ]
 }
