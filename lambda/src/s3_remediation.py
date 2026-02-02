@@ -76,7 +76,7 @@ def get_sns_client():
 
 # S3 bucket naming rules: 3-63 chars, lowercase, numbers, hyphens, periods
 BUCKET_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
-FINDING_ID_PATTERN = re.compile(r"^[\w-]+$")
+FINDING_ID_PATTERN = re.compile(r"^[\w:/.+-]+$")
 
 
 def validate_bucket_name(bucket_name: str) -> bool:

@@ -78,7 +78,7 @@ def get_remediation_events(table_name: str, days: int) -> list[dict]:
     cutoff_iso = cutoff_time.isoformat()
 
     all_items = []
-    violation_types = ["IAM", "S3", "SecurityGroup"]
+    violation_types = ["IAM_WILDCARD_POLICY", "S3_PUBLIC_BUCKET", "SECURITY_GROUP_OPEN"]
 
     for violation_type in violation_types:
         try:
@@ -135,9 +135,9 @@ def calculate_statistics(events: list[dict]) -> dict:
         }
 
     total = len(events)
-    successful = sum(1 for e in events if e.get("status") == "REMEDIATED")
-    failed = sum(1 for e in events if e.get("status") in ["FAILED", "ERROR"])
-    skipped = sum(1 for e in events if e.get("status") == "SKIPPED")
+    successful = sum(1 for e in events if e.get("remediation_status") == "SUCCESS")
+    failed = sum(1 for e in events if e.get("remediation_status") in ["FAILED", "ERROR"])
+    skipped = sum(1 for e in events if e.get("remediation_status") == "SKIPPED")
 
     success_rate = (successful / total * 100) if total > 0 else 0.0
 
@@ -148,9 +148,9 @@ def calculate_statistics(events: list[dict]) -> dict:
         if vtype not in by_type:
             by_type[vtype] = {"total": 0, "successful": 0, "failed": 0}
         by_type[vtype]["total"] += 1
-        if event.get("status") == "REMEDIATED":
+        if event.get("remediation_status") == "SUCCESS":
             by_type[vtype]["successful"] += 1
-        elif event.get("status") in ["FAILED", "ERROR"]:
+        elif event.get("remediation_status") in ["FAILED", "ERROR"]:
             by_type[vtype]["failed"] += 1
 
     # Calculate mean time to remediate (if detection_time and remediation_time exist)

@@ -77,7 +77,7 @@ def get_sns_client():
 
 # Security Group ID format: sg-xxxxxxxxxxxxxxxxx
 SG_ID_PATTERN = re.compile(r"^sg-[a-f0-9]{8,17}$")
-FINDING_ID_PATTERN = re.compile(r"^[\w-]+$")
+FINDING_ID_PATTERN = re.compile(r"^[\w:/.+-]+$")
 
 
 def validate_security_group_id(sg_id: str) -> bool:

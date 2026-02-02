@@ -78,7 +78,7 @@ ARN_PATTERN = re.compile(
     r"^arn:aws:iam::[0-9]{12}:(policy|user|group|role)/[a-zA-Z0-9+=,.@_/-]+$"
 )
 POLICY_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9+=,.@_-]+$")
-FINDING_ID_PATTERN = re.compile(r"^[\w-]+$")
+FINDING_ID_PATTERN = re.compile(r"^[\w:/.+-]+$")
 
 
 def validate_arn(arn: str) -> bool:

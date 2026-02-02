@@ -134,7 +134,7 @@ resource "aws_iam_role_policy" "s3_remediation_s3" {
         Effect = "Allow"
         Action = [
           "s3:GetBucketPublicAccessBlock",
-          "s3:GetBucketEncryption",
+          "s3:GetEncryptionConfiguration",
           "s3:GetBucketVersioning",
           "s3:GetBucketAcl",
           "s3:GetBucketTagging"
@@ -148,7 +148,7 @@ resource "aws_iam_role_policy" "s3_remediation_s3" {
         Effect = "Allow"
         Action = [
           "s3:PutBucketPublicAccessBlock",
-          "s3:PutBucketEncryption",
+          "s3:PutEncryptionConfiguration",
           "s3:PutBucketVersioning"
         ]
         Resource = "arn:aws:s3:::*"

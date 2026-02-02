@@ -22,24 +22,22 @@ resource "aws_cloudwatch_event_rule" "iam_wildcard" {
     detail-type = ["Security Hub Findings - Imported"]
     detail = {
       findings = {
-        # Match NEW findings only (not updates to existing)
-        Workflow = {
-          Status = ["NEW"]
-        }
         # Match FAILED compliance status
         Compliance = {
           Status = ["FAILED"]
+          # Match specific control IDs for IAM wildcard issues
+          SecurityControlId = [
+            "IAM.1", # Full admin privileges
+            "IAM.21" # Wildcard actions in customer policies
+          ]
         }
         # Match IAM-related findings
         Resources = {
           Type = ["AwsIamPolicy"]
         }
-        # Match specific control IDs for IAM wildcard issues
-        ProductFields = {
-          "ControlId" = [
-            "IAM.1", # Full admin privileges
-            "IAM.21" # Wildcard actions in customer policies
-          ]
+        # Match NEW or NOTIFIED workflow status
+        Workflow = {
+          Status = ["NEW", "NOTIFIED"]
         }
       }
     }
@@ -87,17 +85,9 @@ resource "aws_cloudwatch_event_rule" "s3_public" {
     detail-type = ["Security Hub Findings - Imported"]
     detail = {
       findings = {
-        Workflow = {
-          Status = ["NEW"]
-        }
         Compliance = {
           Status = ["FAILED"]
-        }
-        Resources = {
-          Type = ["AwsS3Bucket"]
-        }
-        ProductFields = {
-          "ControlId" = [
+          SecurityControlId = [
             "S3.1", # Block Public Access
             "S3.2", # Prohibit public read
             "S3.3", # Prohibit public write
@@ -106,6 +96,12 @@ resource "aws_cloudwatch_event_rule" "s3_public" {
             "S3.8", # Block public access at bucket level
             "S3.19" # Access points block public access
           ]
+        }
+        Resources = {
+          Type = ["AwsS3Bucket"]
+        }
+        Workflow = {
+          Status = ["NEW", "NOTIFIED"]
         }
       }
     }
@@ -149,22 +145,20 @@ resource "aws_cloudwatch_event_rule" "sg_open" {
     detail-type = ["Security Hub Findings - Imported"]
     detail = {
       findings = {
-        Workflow = {
-          Status = ["NEW"]
-        }
         Compliance = {
           Status = ["FAILED"]
-        }
-        Resources = {
-          Type = ["AwsEc2SecurityGroup"]
-        }
-        ProductFields = {
-          "ControlId" = [
+          SecurityControlId = [
             "EC2.2",  # Default SG restricts all traffic
             "EC2.18", # Unrestricted incoming traffic
             "EC2.19", # High risk ports unrestricted
             "EC2.21"  # Network ACLs unrestricted ingress
           ]
+        }
+        Resources = {
+          Type = ["AwsEc2SecurityGroup"]
+        }
+        Workflow = {
+          Status = ["NEW", "NOTIFIED"]
         }
       }
     }

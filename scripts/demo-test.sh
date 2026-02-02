@@ -12,7 +12,7 @@
 # - jq installed for JSON parsing
 #
 # Author: IaC Secure Gate Team
-# Version: 1.0.0
+# Version: 1.1.0 (Windows compatible)
 # ==================================================================
 
 set -e
@@ -20,6 +20,24 @@ set -e
 # ==================================================================
 # Configuration
 # ==================================================================
+
+# Get script directory (works on both Linux and Windows Git Bash)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMP_DIR="${SCRIPT_DIR}/.temp"
+
+# Create temp directory if it doesn't exist
+mkdir -p "${TEMP_DIR}"
+
+# Function to convert Git Bash path to Windows path for AWS CLI
+to_windows_path() {
+    local path="$1"
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        # Convert /c/Users/... to C:/Users/...
+        echo "$path" | sed 's|^/\([a-zA-Z]\)/|\1:/|'
+    else
+        echo "$path"
+    fi
+}
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION="eu-west-1"
@@ -166,6 +184,13 @@ cleanup_resources() {
         print_success "Security Group deleted"
     fi
 
+    # Cleanup temp files
+    if [ -d "${TEMP_DIR}" ]; then
+        print_step "Cleaning up temp files..."
+        rm -rf "${TEMP_DIR}"
+        print_success "Temp files deleted"
+    fi
+
     print_success "Cleanup complete"
 }
 
@@ -224,7 +249,7 @@ if [ "$TEST_IAM" = true ]; then
 
     # Step 3: Create Security Hub finding event
     print_step "Creating Security Hub finding event..."
-    cat > /tmp/iam-test-event.json << EOF
+    cat > ${TEMP_DIR}/iam-test-event.json << EOF
 {
   "version": "0",
   "id": "demo-iam-$(date +%s)",
@@ -257,16 +282,18 @@ EOF
     print_step "Invoking IAM remediation Lambda..."
     START_TIME=$(date +%s.%N)
 
+    IAM_EVENT_PATH=$(to_windows_path "${TEMP_DIR}/iam-test-event.json")
+    IAM_OUTPUT_PATH=$(to_windows_path "${TEMP_DIR}/iam-lambda-output.json")
     LAMBDA_RESPONSE=$(aws lambda invoke \
         --function-name "${IAM_LAMBDA}" \
-        --payload fileb:///tmp/iam-test-event.json \
+        --payload "file://${IAM_EVENT_PATH}" \
         --cli-binary-format raw-in-base64-out \
-        /tmp/iam-lambda-output.json 2>&1)
+        "${IAM_OUTPUT_PATH}" 2>&1)
 
     END_TIME=$(date +%s.%N)
     DURATION=$(echo "$END_TIME - $START_TIME" | bc 2>/dev/null || echo "N/A")
 
-    RESULT=$(cat /tmp/iam-lambda-output.json)
+    RESULT=$(cat "${TEMP_DIR}/iam-lambda-output.json")
     STATUS=$(echo "$RESULT" | jq -r '.body' 2>/dev/null | jq -r '.status' 2>/dev/null || echo "UNKNOWN")
 
     if [ "$STATUS" = "REMEDIATED" ]; then
@@ -336,7 +363,7 @@ if [ "$TEST_S3" = true ]; then
 
     # Step 4: Create Security Hub finding event
     print_step "Creating Security Hub finding event..."
-    cat > /tmp/s3-test-event.json << EOF
+    cat > ${TEMP_DIR}/s3-test-event.json << EOF
 {
   "version": "0",
   "id": "demo-s3-$(date +%s)",
@@ -369,16 +396,18 @@ EOF
     print_step "Invoking S3 remediation Lambda..."
     START_TIME=$(date +%s.%N)
 
+    S3_EVENT_PATH=$(to_windows_path "${TEMP_DIR}/s3-test-event.json")
+    S3_OUTPUT_PATH=$(to_windows_path "${TEMP_DIR}/s3-lambda-output.json")
     LAMBDA_RESPONSE=$(aws lambda invoke \
         --function-name "${S3_LAMBDA}" \
-        --payload fileb:///tmp/s3-test-event.json \
+        --payload "file://${S3_EVENT_PATH}" \
         --cli-binary-format raw-in-base64-out \
-        /tmp/s3-lambda-output.json 2>&1)
+        "${S3_OUTPUT_PATH}" 2>&1)
 
     END_TIME=$(date +%s.%N)
     DURATION=$(echo "$END_TIME - $START_TIME" | bc 2>/dev/null || echo "N/A")
 
-    RESULT=$(cat /tmp/s3-lambda-output.json)
+    RESULT=$(cat "${TEMP_DIR}/s3-lambda-output.json")
     STATUS=$(echo "$RESULT" | jq -r '.body' 2>/dev/null | jq -r '.status' 2>/dev/null || echo "UNKNOWN")
 
     if [ "$STATUS" = "REMEDIATED" ]; then
@@ -439,7 +468,7 @@ if [ "$TEST_SG" = true ]; then
 
         # Step 4: Create Security Hub finding event
         print_step "Creating Security Hub finding event..."
-        cat > /tmp/sg-test-event.json << EOF
+        cat > ${TEMP_DIR}/sg-test-event.json << EOF
 {
   "version": "0",
   "id": "demo-sg-$(date +%s)",
@@ -472,16 +501,18 @@ EOF
         print_step "Invoking Security Group remediation Lambda..."
         START_TIME=$(date +%s.%N)
 
+        SG_EVENT_PATH=$(to_windows_path "${TEMP_DIR}/sg-test-event.json")
+        SG_OUTPUT_PATH=$(to_windows_path "${TEMP_DIR}/sg-lambda-output.json")
         LAMBDA_RESPONSE=$(aws lambda invoke \
             --function-name "${SG_LAMBDA}" \
-            --payload fileb:///tmp/sg-test-event.json \
+            --payload "file://${SG_EVENT_PATH}" \
             --cli-binary-format raw-in-base64-out \
-            /tmp/sg-lambda-output.json 2>&1)
+            "${SG_OUTPUT_PATH}" 2>&1)
 
         END_TIME=$(date +%s.%N)
         DURATION=$(echo "$END_TIME - $START_TIME" | bc 2>/dev/null || echo "N/A")
 
-        RESULT=$(cat /tmp/sg-lambda-output.json)
+        RESULT=$(cat "${TEMP_DIR}/sg-lambda-output.json")
         STATUS=$(echo "$RESULT" | jq -r '.body' 2>/dev/null | jq -r '.status' 2>/dev/null || echo "UNKNOWN")
 
         if [ "$STATUS" = "REMEDIATED" ]; then
