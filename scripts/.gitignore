@@ -1,2 +1,7 @@
 # Temp files created by demo script
 .temp/
+
+# E2E test results (generated automatically)
+e2e-*-results-*.txt
+e2e-timing-results-*.txt
+e2e-full-results-*.txt
