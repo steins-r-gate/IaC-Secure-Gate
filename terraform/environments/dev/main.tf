@@ -178,8 +178,8 @@ module "security_hub" {
   # Standards configuration
   enable_cis_standard           = true
   cis_standard_version          = var.cis_standard_version
-  enable_foundational_standard  = true
-  foundational_standard_version = "1.0.0" # 200+ controls
+  enable_foundational_standard  = false # Disabled to reduce costs (~70% fewer Config rules)
+  foundational_standard_version = "1.0.0" # 200+ controls (not deployed when disabled)
 
   # Product integrations
   enable_config_integration          = true
@@ -234,7 +234,7 @@ module "lambda_remediation" {
 
   # DRY RUN MODE: Set to true for safe testing (logs but doesn't modify)
   # IMPORTANT: Set to false for production remediation
-  dry_run_mode = true
+  dry_run_mode = false
 
   # KMS encryption for Lambda environment variables
   # Note: Disabled because foundation KMS key policy blocks direct Lambda decrypt
