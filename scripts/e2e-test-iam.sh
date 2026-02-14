@@ -13,7 +13,8 @@ set -e
 # ==================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RESULTS_DIR="${SCRIPT_DIR}"
+RESULTS_DIR="${SCRIPT_DIR}/results"
+mkdir -p "${RESULTS_DIR}"
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION="eu-west-1"

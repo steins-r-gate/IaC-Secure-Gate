@@ -93,7 +93,7 @@ Every security event and remediation action must be logged and traceable. This i
 
 The project is entirely cloud-based and does not require specialized hardware. Development is performed on a standard Windows workstation with the following specifications:
 
-- Windows 10/11 operating system
+- Windows 10 operating system
 - Minimum 8GB RAM for running Terraform and AWS CLI operations
 - Internet connectivity for AWS API access
 - Local storage for Terraform state files and Lambda deployment packages
@@ -266,7 +266,24 @@ The project follows an iterative prototyping approach divided into five phases, 
 - DynamoDB table with 90-day TTL and Global Secondary Indexes
 - MTTR under 30 seconds validated through testing
 
-### Phase 3: IaC Security Gate (Weeks 9-12) - PLANNED
+### Phase 3: Metrics & Feedback Loop (Weeks 9-12) - PLANNED
+
+**Objective:** Provide comprehensive security posture visualization and implement a self-improving security policy system.
+
+**Key Activities:**
+- Deploy Grafana dashboards connected to DynamoDB and CloudWatch data sources
+- Implement DynamoDB Streams consumer for real-time dashboard updates
+- Create analytics Lambda for automated pattern analysis
+- Build feedback loop generating OPA policies from runtime findings
+
+**Dependencies:** Phase 2 DynamoDB audit data and or Phase 3 OPA policy framework
+
+**Expected Outputs:**
+- Real-time security posture dashboards
+- MTTD/MTTR trend visualization
+- Automated policy generation from detected violations
+
+### Phase 3: IaC Security Gate (Weeks 13-16) - PLANNED
 
 **Objective:** Implement shift-left security by adding pre-deployment security scanning to the CI/CD pipeline.
 
@@ -282,23 +299,6 @@ The project follows an iterative prototyping approach divided into five phases, 
 - GitHub Actions security scanning workflow
 - 5+ custom OPA policies
 - PR gate blocking critical misconfigurations before deployment
-
-### Phase 4: Metrics & Feedback Loop (Weeks 13-16) - PLANNED
-
-**Objective:** Provide comprehensive security posture visualization and implement a self-improving security policy system.
-
-**Key Activities:**
-- Deploy Grafana dashboards connected to DynamoDB and CloudWatch data sources
-- Implement DynamoDB Streams consumer for real-time dashboard updates
-- Create analytics Lambda for automated pattern analysis
-- Build feedback loop generating OPA policies from runtime findings
-
-**Dependencies:** Phase 2 DynamoDB audit data, Phase 3 OPA policy framework
-
-**Expected Outputs:**
-- Real-time security posture dashboards
-- MTTD/MTTR trend visualization
-- Automated policy generation from detected violations
 
 ### Phase 5: Testing & Documentation (Weeks 17-20) - PLANNED
 
@@ -361,7 +361,7 @@ The project follows an iterative prototyping approach divided into five phases, 
 - DynamoDB remediation-history table with partition key (violation_type) and sort key (timestamp)
 - Global Secondary Indexes for querying by resource ARN and remediation status
 - 90-day TTL for automatic cleanup
-- DynamoDB Streams enabled for Phase 4 real-time dashboard
+- DynamoDB Streams enabled for Phase 3 real-time dashboard
 
 **Notification System:**
 - SNS topic for immediate remediation alerts
@@ -380,14 +380,14 @@ The project follows an iterative prototyping approach divided into five phases, 
 ### Phase 3-5 Deliverables (PLANNED)
 
 **Phase 3:**
-- GitHub Actions workflow with Checkov integration
-- 5+ custom OPA policies for IAM security
-- PR blocking capability for critical findings
-
-**Phase 4:**
 - Grafana dashboards (Security Posture, Remediation Performance, Executive Summary)
 - Automated OPA policy generation from runtime findings
 - 30-day trend visualization
+
+**Phase 4:**
+- GitHub Actions workflow with Checkov integration
+- 5+ custom OPA policies for IAM security
+- PR blocking capability for critical findings
 
 **Phase 5:**
 - Final test report with 10 attack scenarios
@@ -599,17 +599,7 @@ The immediate priority is completing the Phase 2 integration:
 - Deploy and test the analytics Lambda for daily remediation reports
 - Conduct full end-to-end testing with actual Security Hub triggers
 
-**Phase 3 - IaC Security Gate:**
-
-Building on the remediation patterns identified in Phase 2, custom security policies will be created for pre-deployment scanning:
-- GitHub Actions workflow integrating Checkov for Terraform static analysis
-- Custom OPA/Rego policies encoding the violation patterns that Phase 2 remediates
-- PR blocking logic preventing deployment of known-bad configurations
-- SARIF output enabling GitHub Security tab integration
-
-The goal is to prevent misconfigurations before they are deployed, reducing the need for runtime remediation.
-
-**Phase 4 - Metrics & Dashboards:**
+**Phase 3 - Metrics & Dashboards:**
 
 Visualization of the security pipeline will provide operational insights:
 - Grafana dashboards consuming DynamoDB Streams for real-time remediation visibility
@@ -618,6 +608,16 @@ Visualization of the security pipeline will provide operational insights:
 - Executive summary views for management reporting
 
 A feedback loop will analyze remediation patterns to automatically generate OPA policies, creating a self-improving security system.
+
+**Phase 4 - IaC Security Gate:**
+
+Building on the remediation patterns identified in Phase 2, custom security policies will be created for pre-deployment scanning:
+- GitHub Actions workflow integrating Checkov for Terraform static analysis
+- Custom OPA/Rego policies encoding the violation patterns that Phase 2 remediates
+- PR blocking logic preventing deployment of known-bad configurations
+- SARIF output enabling GitHub Security tab integration
+
+The goal is to prevent misconfigurations before they are deployed, reducing the need for runtime remediation.
 
 **Phase 5 - Testing & Documentation:**
 
