@@ -1,6 +1,6 @@
 # IaC-Secure-Gate: Complete Architecture Documentation
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** February 2026
 **Author:** Final Year Project - Cloud Security Automation
 **Status:** Production Ready
@@ -13,12 +13,13 @@
 2. [System Architecture](#2-system-architecture)
 3. [Phase 1: Detection Architecture](#3-phase-1-detection-architecture)
 4. [Phase 2: Remediation Architecture](#4-phase-2-remediation-architecture)
-5. [Data Flow Diagrams](#5-data-flow-diagrams)
-6. [Security Architecture](#6-security-architecture)
-7. [Cost Architecture](#7-cost-architecture)
-8. [Performance Metrics](#8-performance-metrics)
-9. [Terraform Module Structure](#9-terraform-module-structure)
-10. [Appendix: CIS Controls Mapping](#10-appendix-cis-controls-mapping)
+5. [Phase 3: Prevention Architecture](#5-phase-3-prevention-architecture)
+6. [Data Flow Diagrams](#6-data-flow-diagrams)
+7. [Security Architecture](#7-security-architecture)
+8. [Cost Architecture](#8-cost-architecture)
+9. [Performance Metrics](#9-performance-metrics)
+10. [Terraform Module Structure](#10-terraform-module-structure)
+11. [Appendix: CIS Controls Mapping](#11-appendix-cis-controls-mapping)
 
 ---
 
@@ -26,15 +27,22 @@
 
 ### 1.1 What is IaC-Secure-Gate?
 
-IaC-Secure-Gate is an automated cloud security system that **detects** and **remediates** security misconfigurations in AWS infrastructure. Built entirely with Infrastructure as Code (Terraform), it provides continuous compliance monitoring aligned with the CIS AWS Foundations Benchmark.
+IaC-Secure-Gate is an automated cloud security system that **prevents**, **detects**, and **remediates** security misconfigurations in AWS infrastructure. Built entirely with Infrastructure as Code (Terraform), it provides continuous compliance monitoring aligned with the CIS AWS Foundations Benchmark, with a pre-deployment security gate that blocks violations before they reach AWS.
 
 ### 1.2 High-Level Architecture
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════╗
-║                              AWS CLOUD ENVIRONMENT                                       ║
+║                            COMPLETE SECURITY ARCHITECTURE                                ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                          ║
+║  ┌─────────────────────────────────────────────────────────────────────────────────────┐ ║
+║  │                    PHASE 3: PREVENTION (GitHub Actions)                              │ ║
+║  │    Developer → PR → [Checkov (286 checks)] + [OPA/Rego (7 policies)] → Gate        │ ║
+║  │    MTTP: 0 seconds — violations never reach AWS                                     │ ║
+║  └──────────────────────────────────┬──────────────────────────────────────────────────┘ ║
+║                                     │ (merge allowed)                                    ║
+║                                     ▼                                                    ║
 ║  ┌─────────────────────────────────────┐    ┌────────────────────────────────────────┐  ║
 ║  │       PHASE 1: DETECTION            │    │       PHASE 2: REMEDIATION             │  ║
 ║  │       (Passive Monitoring)          │    │       (Active Response)                │  ║
@@ -47,42 +55,45 @@ IaC-Secure-Gate is an automated cloud security system that **detects** and **rem
 ║  │        │                │          │     │         │                              │  ║
 ║  │        │    ┌───────────┴───┐      │     │    ┌────┴────┬──────────┬─────────┐    │  ║
 ║  │        │    │ IAM Access    │      │     │    │         │          │         │    │  ║
-║  │        │    │  Analyzer     │      │     │    ▼         ▼          ▼         │   1 │  ║
-║  │        │    └───────┬───────┘      │     │ ┌──────┐ ┌──────┐ ┌──────┐        │     │  ║
-║  │        │            │              │     │ │Lambda│ │Lambda│ │Lambda│        │     │  ║
-║  │        ▼            ▼              │     │ │ IAM  │ │  S3  │ │  SG  │        │     │  ║
-║  │  ┌─────────────────────────────┐   │     │ └──┬───┘ └──┬───┘ └──┬───┘        │     │  ║
-║  │  │       SECURITY HUB          │   │     │    │        │        │            │     │  ║
-║  │  │    (Centralized Findings)   │───┼─────┼────┘        │        │            │     │  ║
-║  │  └─────────────────────────────┘   │     │             ▼        ▼            │     │  ║
-║  │                                     │     │  ┌─────────────────────────┐      │     │  ║
-║  └─────────────────────────────────────┘     │  │      DynamoDB           │      │     │  ║
-║                                              │  │    (Audit Trail)        │      │     │  ║
-║                                              │  └───────────┬─────────────┘      │     │  ║
-║  ┌─────────────────────────────────────┐     │              │                    │     │  ║
-║  │         DATA LAYER                  │     │              ▼                    │     │  ║
-║  ├─────────────────────────────────────┤     │  ┌─────────────────────────┐      │     │  ║
-║  │  ┌──────────┐  ┌──────────┐        │     │  │    SNS Notifications    │      │     │  ║
-║  │  │    S3    │  │    S3    │        │     │  └───────────┬─────────────┘      │     │  ║
-║  │  │CloudTrail│  │  Config  │        │     │              │                    │     │  ║
-║  │  │   Logs   │  │ Snapshots│        │     │              ▼                    │     │  ║
-║  │  └────┬─────┘  └────┬─────┘        │     │  ┌─────────────────────────┐      │     │  ║
-║  │       │             │              │     │  │   Analytics Lambda      │      │     │  ║
-║  │       └──────┬──────┘              │     │  │   (Daily Reports)       │      │     │  ║
-║  │              ▼                     │     │  └─────────────────────────┘      │     │  ║
-║  │  ┌─────────────────────────┐       │     │                                   │     │  ║
-║  │  │     KMS Encryption      │       │     └───────────────────────────────────┘     │  ║
-║  │  │    (Customer Key)       │       │                                               │  ║
-║  │  └─────────────────────────┘       │                                               │  ║
-║  └─────────────────────────────────────┘                                               ║
-║                                                                                           ║
-╚═══════════════════════════════════════════════════════════════════════════════════════════╝
+║  │        │    │  Analyzer     │      │     │    ▼         ▼          ▼         │    │  ║
+║  │        │    └───────┬───────┘      │     │ ┌──────┐ ┌──────┐ ┌──────┐        │    │  ║
+║  │        │            │              │     │ │Lambda│ │Lambda│ │Lambda│        │    │  ║
+║  │        ▼            ▼              │     │ │ IAM  │ │  S3  │ │  SG  │        │    │  ║
+║  │  ┌─────────────────────────────┐   │     │ └──┬───┘ └──┬───┘ └──┬───┘        │    │  ║
+║  │  │       SECURITY HUB          │   │     │    │        │        │            │    │  ║
+║  │  │    (Centralized Findings)   │───┼─────┼────┘        │        │            │    │  ║
+║  │  └─────────────────────────────┘   │     │             ▼        ▼            │    │  ║
+║  │                                     │     │  ┌─────────────────────────┐      │    │  ║
+║  └─────────────────────────────────────┘     │  │      DynamoDB           │      │    │  ║
+║                                              │  │    (Audit Trail)        │      │    │  ║
+║  ┌─────────────────────────────────────┐     │  └───────────┬─────────────┘      │    │  ║
+║  │         DATA LAYER                  │     │              │                    │    │  ║
+║  ├─────────────────────────────────────┤     │              ▼                    │    │  ║
+║  │  ┌──────────┐  ┌──────────┐        │     │  ┌─────────────────────────┐      │    │  ║
+║  │  │    S3    │  │    S3    │        │     │  │    SNS Notifications    │      │    │  ║
+║  │  │CloudTrail│  │  Config  │        │     │  └───────────┬─────────────┘      │    │  ║
+║  │  │   Logs   │  │ Snapshots│        │     │              │                    │    │  ║
+║  │  └────┬─────┘  └────┬─────┘        │     │              ▼                    │    │  ║
+║  │       │             │              │     │  ┌─────────────────────────┐      │    │  ║
+║  │       └──────┬──────┘              │     │  │   Analytics Lambda      │      │    │  ║
+║  │              ▼                     │     │  │   (Daily Reports)       │      │    │  ║
+║  │  ┌─────────────────────────┐       │     │  └─────────────────────────┘      │    │  ║
+║  │  │     KMS Encryption      │       │     │                                   │    │  ║
+║  │  │    (Customer Key)       │       │     └───────────────────────────────────┘    │  ║
+║  │  └─────────────────────────┘       │                                              │  ║
+║  └─────────────────────────────────────┘                                              ║
+║                                                                                          ║
+║  Phase 2 remediation patterns ─── inform ───▶ Phase 3 prevention policies               ║
+║  (The Feedback Loop: runtime insights become commit-time deny rules)                     ║
+║                                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
 ### 1.3 Key Benefits
 
 | Benefit | Description |
 |---------|-------------|
+| **Pre-Deployment Prevention** | Blocks violations before they reach AWS (MTTP: 0s) |
 | **Automated Detection** | Continuous monitoring of 233+ security controls |
 | **Instant Remediation** | Sub-second response to security violations |
 | **Complete Audit Trail** | Every action logged and traceable |
@@ -94,14 +105,22 @@ IaC-Secure-Gate is an automated cloud security system that **detects** and **rem
 
 ## 2. System Architecture
 
-### 2.1 Two-Phase Design
+### 2.1 Three-Phase Design
 
-The system operates in two distinct phases:
+The system operates in three distinct phases, forming a closed feedback loop:
 
 ```mermaid
 flowchart LR
+    subgraph Phase3["Phase 3: Prevention<br/>(Pre-Deployment Gate)"]
+        X[PR Created] --> Y[Checkov + OPA Scan]
+        Y --> Z{Pass?}
+        Z -->|No| BLOCK[PR Blocked]
+        Z -->|Yes| MERGE[Merge]
+    end
+
     subgraph Phase1["Phase 1: Detection<br/>(Passive Monitoring)"]
-        A[Resource Change] --> B[API Logged]
+        MERGE --> A[Resource Change]
+        A --> B[API Logged]
         B --> C[Config Records]
         C --> D[Rules Evaluate]
         D --> E[Finding Created]
@@ -116,6 +135,9 @@ flowchart LR
         J --> K[Alert Sent]
     end
 
+    K -.->|Informs Policy Design| Y
+
+    style Phase3 fill:#e8f5e9
     style Phase1 fill:#e1f5fe
     style Phase2 fill:#fff3e0
 ```
@@ -137,6 +159,9 @@ flowchart LR
 | DynamoDB | 2 | Remediation audit trail | `remediation-tracking` |
 | SNS | 2 | Notifications | `self-improvement` |
 | Lambda (Analytics) | 2 | Daily reporting | `self-improvement` |
+| GitHub Actions | 3 | CI/CD security pipeline | `.github/workflows/` |
+| Checkov | 3 | Static IaC scanning (286 checks) | `.checkov.yml` |
+| OPA/Conftest | 3 | Custom policy evaluation (7 policies) | `policies/opa/` |
 
 ---
 
@@ -758,9 +783,121 @@ flowchart TB
 
 ---
 
-## 5. Data Flow Diagrams
+## 5. Phase 3: Prevention Architecture
 
-### 5.1 Detection Data Flow
+### 5.1 Pre-Deployment Security Gate
+
+Phase 3 shifts security **left** in the development lifecycle. Every pull request is automatically scanned by two complementary tools before merge is allowed.
+
+```mermaid
+flowchart TB
+    subgraph "Developer Workflow"
+        DEV[Developer] -->|Push Code| PR[Pull Request]
+    end
+
+    subgraph "GitHub Actions Pipeline (~2 min)"
+        PR -->|Trigger| VALIDATE[Job 1: Terraform Validate]
+        VALIDATE -->|Parallel| CHECKOV[Job 2: Checkov Scan]
+        VALIDATE -->|Parallel| OPA[Job 3: OPA/Conftest]
+        CHECKOV -->|Results| COMMENT[Job 4: PR Comment]
+        OPA -->|Results| COMMENT
+    end
+
+    subgraph "Gate Decision"
+        COMMENT --> GATE{All Checks Pass?}
+        GATE -->|Yes| MERGE[Merge Allowed]
+        GATE -->|No| BLOCK[Merge Blocked]
+    end
+```
+
+### 5.2 Scanning Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          SCANNING ARCHITECTURE                              │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Layer 1: BROAD COVERAGE                Layer 2: CUSTOM POLICIES            │
+│  ┌──────────────────────┐               ┌──────────────────────────┐       │
+│  │       CHECKOV        │               │    CONFTEST + OPA/REGO   │       │
+│  │                      │               │                          │       │
+│  │  • 286 checks pass   │               │  • 7 custom policies     │       │
+│  │  • 21 justified      │               │  • Derived from Phase 2  │       │
+│  │    suppressions      │               │  • Evaluates plan JSON   │       │
+│  │  • CIS, NIST, SOC2   │               │  • Budget enforcement    │       │
+│  │  • SARIF output      │               │  • AWS creds (read-only) │       │
+│  └──────────────────────┘               └──────────────────────────┘       │
+│                                                                              │
+│  What it catches:                       What it catches:                    │
+│  • Industry-standard                    • IAM wildcard permissions          │
+│    security violations                  • S3 public access & encryption    │
+│  • Missing encryption,                  • Open security group ports        │
+│    public access, etc.                  • Budget constraints               │
+│                                         • Missing resource tags            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.3 Custom OPA/Rego Policies
+
+7 policies derived from Phase 2 Lambda remediation logic (the feedback loop):
+
+| Policy File | Severity | Phase 2 Source | What It Prevents |
+|-------------|----------|----------------|------------------|
+| `iam.rego` | CRITICAL | `iam_remediation.py` L141-145 | Wildcard IAM permissions (`*`, `iam:*`, `*:*`) |
+| `s3.rego` | CRITICAL | `s3_remediation.py` L230-309 | Public S3 buckets, missing encryption |
+| `sg.rego` | CRITICAL | `sg_remediation.py` L214-226 | 11 dangerous ports open to 0.0.0.0/0 |
+| `encryption.rego` | CRITICAL | `s3_remediation.py` (extended) | Unencrypted DynamoDB, SQS, SNS |
+| `tagging.rego` | CRITICAL | Cross-cutting concern | Missing Project/Environment/ManagedBy tags |
+| `cost_guard.rego` | CRITICAL | Budget constraint (€15/month) | Provisioned DynamoDB, oversized Lambdas |
+| `policy_metadata.json` | — | Traceability document | Maps every policy to Phase 2 source code |
+
+### 5.4 The Feedback Loop
+
+The key academic contribution — runtime remediation patterns inform commit-time prevention:
+
+```
+Phase 2 (Runtime)                              Phase 3 (Commit-Time)
+─────────────────                              ─────────────────────
+iam_remediation.py                   ───▶      iam.rego
+  dangerous_patterns = ["*","iam:*","*:*"]       dangerous_actions = {"*","iam:*","*:*"}
+
+sg_remediation.py                    ───▶      sg.rego
+  dangerous_ports = {22,23,3389,...}             dangerous_ports = {22,23,3389,...}
+
+s3_remediation.py                    ───▶      s3.rego
+  block_public_access(all 4 settings)            deny if any setting is false
+```
+
+### 5.5 CI/CD Infrastructure
+
+| Component | Configuration |
+|-----------|---------------|
+| **Workflow** | `.github/workflows/security-scan.yml` (4 jobs) |
+| **Checkov Config** | `.checkov.yml` (21 skip rules with justifications) |
+| **OPA Policies** | `policies/opa/` (6 Rego files + 1 JSON) |
+| **CI IAM User** | `iac-secure-gate-ci-readonly` (Describe/Get/List only) |
+| **Terraform** | v1.13.5 |
+| **Conftest** | v0.46.0 |
+| **Pipeline Duration** | ~2 minutes |
+| **Cost** | €0/month (GitHub Actions free tier) |
+
+### 5.6 Performance: Three-Phase Security Timeline
+
+```
+WITHOUT Phase 3 (Phase 1+2 only):
+  Deploy → Config detects (~2 min) → Security Hub → EventBridge → Lambda fix (1.66s)
+  Exposure: ~2 minutes
+
+WITH Phase 3:
+  PR → Checkov + OPA scan (~2 min) → PR BLOCKED → Developer fixes → Clean deploy
+  Exposure: 0 seconds — violation never reaches AWS
+```
+
+---
+
+## 6. Data Flow Diagrams
+
+### 6.1 Detection Data Flow
 
 ```mermaid
 flowchart TB
@@ -785,7 +922,7 @@ flowchart TB
     style SH fill:#c8e6c9
 ```
 
-### 5.2 Remediation Data Flow
+### 6.2 Remediation Data Flow
 
 ```mermaid
 flowchart TB
@@ -807,7 +944,7 @@ flowchart TB
     style SNS fill:#b3e5fc
 ```
 
-### 5.3 Audit Data Flow
+### 6.3 Audit Data Flow
 
 ```mermaid
 flowchart TB
@@ -828,7 +965,7 @@ flowchart TB
     end
 ```
 
-### 5.4 Notification Data Flow
+### 6.4 Notification Data Flow
 
 ```mermaid
 flowchart TB
@@ -868,9 +1005,9 @@ flowchart TB
 
 ---
 
-## 6. Security Architecture
+## 7. Security Architecture
 
-### 6.1 IAM Roles and Permissions
+### 7.1 IAM Roles and Permissions
 
 ```mermaid
 flowchart TB
@@ -908,7 +1045,7 @@ flowchart TB
 | S3 Lambda | s3:GetBucket*, s3:PutBucket* | S3 only |
 | SG Lambda | ec2:DescribeSecurityGroups, ec2:RevokeSecurityGroupIngress | EC2 only |
 
-### 6.2 Encryption Architecture
+### 7.2 Encryption Architecture
 
 ```mermaid
 flowchart TB
@@ -939,7 +1076,7 @@ flowchart TB
 | Lambda Env Vars | AWS Managed | TLS 1.2+ | AWS Managed |
 | CloudWatch Logs | AWS Managed | TLS 1.2+ | AWS Managed |
 
-### 6.3 Audit Trail Integrity
+### 7.3 Audit Trail Integrity
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -966,9 +1103,9 @@ flowchart TB
 
 ---
 
-## 7. Cost Architecture
+## 8. Cost Architecture
 
-### 7.1 Monthly Cost Breakdown
+### 8.1 Monthly Cost Breakdown
 
 ```mermaid
 pie title Monthly Cost Distribution (€8.51)
@@ -981,7 +1118,7 @@ pie title Monthly Cost Distribution (€8.51)
     "Other (Lambda, DDB, SNS)" : 0.32
 ```
 
-### 7.2 Detailed Cost Analysis
+### 8.2 Detailed Cost Analysis
 
 | Service | Component | Monthly Cost | Notes |
 |---------|-----------|--------------|-------|
@@ -1001,7 +1138,7 @@ pie title Monthly Cost Distribution (€8.51)
 | **Security Hub** | Findings | €0.00 | First 10K free |
 | | **TOTAL** | **€8.51** | **57% under €20 budget** |
 
-### 7.3 Cost Optimization Strategies
+### 8.3 Cost Optimization Strategies
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1021,9 +1158,9 @@ pie title Monthly Cost Distribution (€8.51)
 
 ---
 
-## 8. Performance Metrics
+## 9. Performance Metrics
 
-### 8.1 Key Performance Indicators
+### 9.1 Key Performance Indicators
 
 | Metric | Target | Achieved | Status |
 |--------|--------|----------|--------|
@@ -1032,10 +1169,14 @@ pie title Monthly Cost Distribution (€8.51)
 | **Remediation Success Rate** | >95% | 100% | ✅ |
 | **E2E Test Pass Rate** | 100% | 100% | ✅ |
 | **Monthly Cost** | <€20 | €8.51 | ✅ |
+| **MTTP** (Mean Time to Prevent) | 0 sec | 0 sec | ✅ |
+| **Pipeline Duration** | <3 min | ~2 min | ✅ |
+| **Checkov Checks Passing** | 0 failures | 286 pass, 0 fail | ✅ |
+| **Custom OPA Policies** | ≥7 | 7 | ✅ |
 | **Lambda Cold Start** | <1 sec | ~450ms | ✅ |
 | **Lambda Memory Usage** | <80% | 34% (87/256MB) | ✅ |
 
-### 8.2 Detection Timeline
+### 9.2 Detection Timeline
 
 ```mermaid
 gantt
@@ -1057,7 +1198,7 @@ gantt
     Detection Complete     :milestone, 01:45, 0s
 ```
 
-### 8.3 Remediation Timeline
+### 9.3 Remediation Timeline
 
 ```mermaid
 gantt
@@ -1083,9 +1224,9 @@ gantt
 
 ---
 
-## 9. Terraform Module Structure
+## 10. Terraform Module Structure
 
-### 9.1 Module Hierarchy
+### 10.1 Module Hierarchy
 
 ```
 terraform/
@@ -1148,9 +1289,24 @@ terraform/
         ├── analytics-lambda.tf  # Analytics function
         ├── variables.tf
         └── outputs.tf
+
+policies/                        # Phase 3: OPA Policies
+└── opa/
+    ├── iam.rego                 # IAM wildcard prevention
+    ├── s3.rego                  # S3 public access prevention
+    ├── sg.rego                  # Security group prevention
+    ├── encryption.rego          # Cross-service encryption
+    ├── tagging.rego             # Required resource tags
+    ├── cost_guard.rego          # Budget constraints
+    └── policy_metadata.json     # Traceability to Phase 2
+
+.github/workflows/
+└── security-scan.yml            # Phase 3: 4-job CI pipeline
+
+.checkov.yml                     # Phase 3: Checkov configuration
 ```
 
-### 9.2 Module Dependencies
+### 10.2 Module Dependencies
 
 ```mermaid
 flowchart TB
@@ -1171,7 +1327,7 @@ flowchart TB
     end
 ```
 
-### 9.3 Resource Count
+### 10.3 Resource Count
 
 | Module | Resources | Description |
 |--------|-----------|-------------|
@@ -1184,48 +1340,53 @@ flowchart TB
 | eventbridge-remediation | 9 | 3 rules, 3 targets, 3 DLQs |
 | remediation-tracking | 3 | DynamoDB table, 2 GSIs |
 | self-improvement | 11 | 3 SNS topics, analytics Lambda |
-| **TOTAL** | **80+** | |
+| **Phase 1+2 AWS Total** | **80+** | |
+| OPA policies (Phase 3) | 7 | 6 Rego policies + 1 metadata JSON |
+| GitHub Actions (Phase 3) | 1 | 4-job security pipeline |
+| Checkov config (Phase 3) | 1 | 21 skip rules with justifications |
 
 ---
 
-## 10. Appendix: CIS Controls Mapping
+## 11. Appendix: CIS Controls Mapping
 
-### 10.1 CIS AWS Foundations Benchmark v1.4.0 Coverage
+### 11.1 CIS AWS Foundations Benchmark v1.4.0 Coverage
 
-| CIS Control | Description | Implementation |
-|-------------|-------------|----------------|
-| **1.5** | Ensure MFA is enabled for root account | Config Rule: `root-account-mfa-enabled` |
-| **1.8** | Ensure IAM password policy is configured | Config Rule: `iam-password-policy` |
-| **1.10** | Ensure MFA is enabled for all IAM users | Config Rule: `iam-user-mfa-enabled` |
-| **1.16** | Ensure IAM policies avoid wildcards | Lambda: IAM Remediation |
-| **2.1.1** | Ensure S3 bucket encryption is enabled | Lambda: S3 Remediation |
-| **2.1.2** | Ensure S3 bucket versioning is enabled | Lambda: S3 Remediation |
-| **2.1.5** | Ensure S3 buckets deny public access | Lambda: S3 Remediation |
-| **3.1** | Ensure CloudTrail is enabled | Config Rule + CloudTrail module |
-| **3.2** | Ensure CloudTrail log validation | CloudTrail: `enable_log_file_validation` |
-| **3.3** | Ensure CloudTrail S3 bucket not public | Foundation: S3 bucket policies |
-| **3.8** | Ensure customer managed keys are used | Foundation: KMS CMK |
-| **5.1** | Ensure no security groups allow 0.0.0.0/0 | Lambda: SG Remediation |
-| **5.2** | Ensure no security groups allow SSH from 0.0.0.0/0 | Lambda: SG Remediation |
-| **5.3** | Ensure no security groups allow RDP from 0.0.0.0/0 | Lambda: SG Remediation |
+| CIS Control | Description | Phase 1 (Detection) | Phase 2 (Remediation) | Phase 3 (Prevention) |
+|-------------|-------------|---------------------|----------------------|---------------------|
+| **1.5** | Root account MFA | Config Rule | — | — |
+| **1.8** | IAM password policy | Config Rule | — | — |
+| **1.10** | IAM user MFA | Config Rule | — | — |
+| **1.16** | IAM wildcard policies | Config Rule | IAM Lambda | `iam.rego` |
+| **2.1.1** | S3 encryption | Config Rule | S3 Lambda | `s3.rego` |
+| **2.1.2** | S3 versioning | Config Rule | S3 Lambda | `s3.rego` (warn) |
+| **2.1.5** | S3 public access | Config Rule + Access Analyzer | S3 Lambda | `s3.rego` |
+| **3.1** | CloudTrail enabled | Config Rule | — | Checkov |
+| **3.2** | CloudTrail log validation | CloudTrail module | — | Checkov |
+| **3.3** | CloudTrail bucket not public | S3 bucket policy | — | `s3.rego` |
+| **3.8** | Customer managed keys | KMS CMK | — | `encryption.rego` |
+| **5.1** | SG no 0.0.0.0/0 all ports | Config Rule | SG Lambda | `sg.rego` |
+| **5.2** | SG no SSH from 0.0.0.0/0 | Config Rule | SG Lambda | `sg.rego` |
+| **5.3** | SG no RDP from 0.0.0.0/0 | Config Rule | SG Lambda | `sg.rego` |
 
-### 10.2 Security Hub Control IDs
+### 11.2 Security Hub Control IDs
 
-| Control ID | Finding Type | Remediation Lambda |
-|------------|--------------|-------------------|
-| IAM.1 | IAM policies should not allow full "*" administrative privileges | IAM Remediation |
-| IAM.21 | IAM customer managed policies should not allow wildcard actions | IAM Remediation |
-| S3.1 | S3 Block Public Access setting should be enabled | S3 Remediation |
-| S3.2 | S3 buckets should prohibit public read access | S3 Remediation |
-| S3.3 | S3 buckets should prohibit public write access | S3 Remediation |
-| S3.4 | S3 buckets should have server-side encryption enabled | S3 Remediation |
-| S3.5 | S3 buckets should require SSL | S3 Remediation |
-| S3.8 | S3 Block Public Access should be enabled at bucket level | S3 Remediation |
-| S3.19 | S3 access points should have block public access enabled | S3 Remediation |
-| EC2.2 | Default VPC security groups should not allow traffic | SG Remediation |
-| EC2.18 | Security groups should only allow unrestricted traffic for authorized ports | SG Remediation |
-| EC2.19 | Security groups should not allow unrestricted access to high risk ports | SG Remediation |
-| EC2.21 | Network ACLs should not allow ingress from 0.0.0.0/0 | SG Remediation |
+| Control ID | Finding Type | Phase 2 (Lambda) | Phase 3 (OPA Policy) |
+|------------|--------------|-------------------|---------------------|
+| IAM.1 | IAM policies should not allow full "*" administrative privileges | IAM Remediation | `iam.rego` |
+| IAM.21 | IAM customer managed policies should not allow wildcard actions | IAM Remediation | `iam.rego` |
+| S3.1 | S3 Block Public Access setting should be enabled | S3 Remediation | `s3.rego` |
+| S3.2 | S3 buckets should prohibit public read access | S3 Remediation | `s3.rego` |
+| S3.3 | S3 buckets should prohibit public write access | S3 Remediation | `s3.rego` |
+| S3.4 | S3 buckets should have server-side encryption enabled | S3 Remediation | `s3.rego` |
+| S3.5 | S3 buckets should require SSL | S3 Remediation | Checkov |
+| S3.8 | S3 Block Public Access should be enabled at bucket level | S3 Remediation | `s3.rego` |
+| S3.19 | S3 access points should have block public access enabled | S3 Remediation | `s3.rego` |
+| EC2.2 | Default VPC security groups should not allow traffic | SG Remediation | `sg.rego` |
+| EC2.18 | Security groups should only allow unrestricted traffic for authorized ports | SG Remediation | `sg.rego` |
+| EC2.19 | Security groups should not allow unrestricted access to high risk ports | SG Remediation | `sg.rego` |
+| EC2.21 | Network ACLs should not allow ingress from 0.0.0.0/0 | SG Remediation | `sg.rego` |
+| DynamoDB.1 | DynamoDB tables should have encryption at rest | — | `encryption.rego` |
+| SQS.1 | SQS queues should be encrypted at rest | — | `encryption.rego` |
 
 ---
 
@@ -1233,7 +1394,8 @@ flowchart TB
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.0 | February 2026 | Project Team | Initial comprehensive documentation |
+| 1.0 | February 2026 | Project Team | Initial comprehensive documentation (Phase 1 + 2) |
+| 2.0 | February 2026 | Project Team | Added Phase 3 prevention architecture, updated to three-phase model |
 
 ---
 
