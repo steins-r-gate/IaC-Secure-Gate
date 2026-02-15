@@ -137,9 +137,12 @@ jobs:
             echo "status=failure" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          PASSED=$(grep -oP 'Passed checks: \K\d+' checkov-output.txt || echo "0")
-          FAILED=$(grep -oP 'Failed checks: \K\d+' checkov-output.txt || echo "0")
-          SKIPPED=$(grep -oP 'Skipped checks: \K\d+' checkov-output.txt || echo "0")
+          PASSED=$(grep -oP 'Passed checks: \K\d+' checkov-output.txt || true)
+          FAILED=$(grep -oP 'Failed checks: \K\d+' checkov-output.txt || true)
+          SKIPPED=$(grep -oP 'Skipped checks: \K\d+' checkov-output.txt || true)
+          PASSED=${PASSED:-0}
+          FAILED=${FAILED:-0}
+          SKIPPED=${SKIPPED:-0}
           echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
           echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
           echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
@@ -230,8 +233,10 @@ jobs:
             echo "status=failure" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          FAILURES=$(grep -c "^FAIL" conftest-output.txt || echo "0")
-          WARNINGS=$(grep -c "^WARN" conftest-output.txt || echo "0")
+          FAILURES=$(grep -c "^FAIL" conftest-output.txt || true)
+          WARNINGS=$(grep -c "^WARN" conftest-output.txt || true)
+          FAILURES=${FAILURES:-0}
+          WARNINGS=${WARNINGS:-0}
           echo "failures=$FAILURES" >> "$GITHUB_OUTPUT"
           echo "warnings=$WARNINGS" >> "$GITHUB_OUTPUT"
           if [ "$FAILURES" -gt 0 ] || [ "${{ steps.plan.outcome }}" == "failure" ]; then
