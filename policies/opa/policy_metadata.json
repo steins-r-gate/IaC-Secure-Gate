@@ -1,0 +1,179 @@
+{
+  "schema_version": "1.0",
+  "project": "IaC-Secure-Gate",
+  "description": "Traceability metadata mapping Phase 3 OPA policies to Phase 2 Lambda remediation functions. This file documents the feedback loop — runtime remediation patterns informing commit-time prevention policies.",
+  "last_updated": "2026-02",
+  "policies": [
+    {
+      "policy_file": "iam.rego",
+      "title": "IAM Wildcard Permission Prevention",
+      "severity": "CRITICAL",
+      "phase2_source": {
+        "lambda_function": "lambda/src/iam_remediation.py",
+        "key_function": "is_dangerous_wildcard_action()",
+        "line_references": "Lines 123-151",
+        "dangerous_patterns": ["*", "iam:*", "*:*"],
+        "runtime_action": "Removes wildcard statements from IAM policy documents"
+      },
+      "phase3_action": "Blocks PR when Terraform IAM policy contains wildcard Action on wildcard Resource",
+      "security_hub_controls": ["IAM.1", "IAM.21"],
+      "deny_rules": [
+        "Wildcard actions (*, iam:*, *:*) on Resource '*'",
+        "IAM role trust policy with Principal '*'"
+      ],
+      "warn_rules": [
+        "Wildcard actions on scoped resources"
+      ],
+      "traceability_proof": "The dangerous_actions set in iam.rego is identical to dangerous_patterns list in iam_remediation.py (L141-145)"
+    },
+    {
+      "policy_file": "s3.rego",
+      "title": "S3 Public Access & Encryption Prevention",
+      "severity": "CRITICAL",
+      "phase2_source": {
+        "lambda_function": "lambda/src/s3_remediation.py",
+        "key_functions": ["block_public_access()", "enable_encryption()", "enable_versioning()"],
+        "line_references": "Lines 230-309",
+        "public_access_settings": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "runtime_action": "Enables all 4 public access blocks, SSE-S3 encryption, and versioning"
+      },
+      "phase3_action": "Blocks PR when S3 bucket lacks public access block, encryption, or has any public access setting disabled",
+      "security_hub_controls": ["S3.1", "S3.2", "S3.3", "S3.4", "S3.5", "S3.8", "S3.19"],
+      "deny_rules": [
+        "Any of the 4 public access block settings set to false",
+        "S3 bucket without aws_s3_bucket_public_access_block resource",
+        "S3 bucket without server-side encryption configuration"
+      ],
+      "warn_rules": [
+        "S3 bucket without versioning"
+      ],
+      "traceability_proof": "The 4 public access block checks in s3.rego (block_public_acls, ignore_public_acls, block_public_policy, restrict_public_buckets) map 1:1 to the public_access_block_config dict in s3_remediation.py (L238-243)"
+    },
+    {
+      "policy_file": "sg.rego",
+      "title": "Security Group Open Access Prevention",
+      "severity": "CRITICAL",
+      "phase2_source": {
+        "lambda_function": "lambda/src/sg_remediation.py",
+        "key_function": "is_overly_permissive_rule()",
+        "line_references": "Lines 168-233",
+        "dangerous_ports": [22, 23, 1433, 3306, 3389, 5432, 5601, 6379, 9200, 11211, 27017],
+        "dangerous_port_services": {
+          "22": "SSH",
+          "23": "Telnet",
+          "1433": "MSSQL",
+          "3306": "MySQL",
+          "3389": "RDP",
+          "5432": "PostgreSQL",
+          "5601": "Kibana",
+          "6379": "Redis",
+          "9200": "Elasticsearch",
+          "11211": "Memcached",
+          "27017": "MongoDB"
+        },
+        "runtime_action": "Revokes ingress rules allowing 0.0.0.0/0 or ::/0 on dangerous ports"
+      },
+      "phase3_action": "Blocks PR when security group allows ingress from 0.0.0.0/0 or ::/0 on any of 11 dangerous ports",
+      "security_hub_controls": ["EC2.2", "EC2.18", "EC2.19", "EC2.21"],
+      "deny_rules": [
+        "Dangerous port open to 0.0.0.0/0 (IPv4)",
+        "Dangerous port open to ::/0 (IPv6)",
+        "All-traffic protocol (-1) open to public",
+        "Standalone security group rules with dangerous ports"
+      ],
+      "warn_rules": [
+        "Wide port range (>100 ports) open to public"
+      ],
+      "traceability_proof": "The dangerous_ports set in sg.rego contains the same 11 ports as the dangerous_ports set in sg_remediation.py (L214-226)"
+    },
+    {
+      "policy_file": "encryption.rego",
+      "title": "Cross-Service Encryption Enforcement",
+      "severity": "CRITICAL",
+      "phase2_source": {
+        "lambda_function": "lambda/src/s3_remediation.py",
+        "key_function": "enable_encryption()",
+        "line_references": "Lines 258-287",
+        "runtime_action": "Enables SSE-S3 encryption on S3 buckets; extended to other services in Phase 3"
+      },
+      "phase3_action": "Blocks PR when DynamoDB, SQS, or SNS resources lack encryption configuration",
+      "security_hub_controls": ["DynamoDB.1", "SQS.1"],
+      "deny_rules": [
+        "DynamoDB table without server-side encryption",
+        "SQS queue without SSE-SQS or KMS encryption",
+        "SNS topic without KMS encryption"
+      ],
+      "warn_rules": [
+        "CloudWatch Log Group without KMS encryption"
+      ],
+      "traceability_proof": "Extends the Phase 2 S3 encryption enforcement pattern to all services used by IaC-Secure-Gate"
+    },
+    {
+      "policy_file": "tagging.rego",
+      "title": "Required Resource Tags",
+      "severity": "CRITICAL",
+      "phase2_source": {
+        "description": "Cross-cutting concern derived from project infrastructure patterns",
+        "runtime_action": "N/A — tagging is a preventive-only control"
+      },
+      "phase3_action": "Blocks PR when taggable resources are missing Project, Environment, or ManagedBy tags",
+      "required_tags": {
+        "Project": "Identifies IaC-Secure-Gate resources for cost tracking",
+        "Environment": "Distinguishes dev/staging/prod (valid values: dev, staging, prod)",
+        "ManagedBy": "Must be 'terraform' — enforces IaC management"
+      },
+      "deny_rules": [
+        "Any taggable resource missing required tags",
+        "ManagedBy tag with value other than 'terraform'"
+      ],
+      "warn_rules": [
+        "Environment tag with unexpected value"
+      ],
+      "traceability_proof": "Tags are used throughout Phase 1 and Phase 2 Terraform modules for resource identification and are now enforced as a commit-time requirement"
+    },
+    {
+      "policy_file": "cost_guard.rego",
+      "title": "Budget-Aware Constraints",
+      "severity": "CRITICAL",
+      "phase2_source": {
+        "description": "Derived from the project's monthly budget constraint and Phase 2 infrastructure decisions",
+        "runtime_action": "N/A — cost governance is a preventive-only control"
+      },
+      "phase3_action": "Blocks PR when configurations would exceed the project budget",
+      "budget_context": {
+        "monthly_budget": "EUR 15",
+        "current_spend": "EUR 8.51",
+        "remaining_headroom": "EUR 6.49"
+      },
+      "deny_rules": [
+        "DynamoDB with PROVISIONED billing (minimum ~$15/month)",
+        "Lambda with >512MB memory",
+        "Lambda with >60s timeout"
+      ],
+      "warn_rules": [
+        "Multiple KMS keys (each ~$1/month)",
+        "DynamoDB table without TTL (unbounded growth)"
+      ],
+      "traceability_proof": "Phase 2 DynamoDB uses PAY_PER_REQUEST and Lambda functions use 128-256MB memory — these limits are now enforced as commit-time constraints"
+    }
+  ],
+  "feedback_loop_summary": {
+    "description": "The feedback loop is the key academic contribution of Phase 3. Runtime remediation patterns discovered in Phase 2 are translated into commit-time prevention policies in Phase 3. This creates a closed loop: violations that occur in production inform policies that prevent the same violations from being deployed again.",
+    "flow": [
+      "Phase 1: CloudTrail + Config + Access Analyzer detect misconfiguration",
+      "Phase 2: EventBridge triggers Lambda to remediate automatically (MTTR: 1.66s)",
+      "Phase 2 insight: Lambda code contains the exact patterns that define 'dangerous'",
+      "Phase 3: Those same patterns are encoded as OPA/Rego deny rules",
+      "Phase 3 result: Violation is blocked at PR time (MTTP: 0s — never reaches AWS)"
+    ],
+    "metrics_comparison": {
+      "without_phase3": "MTTD: 4s + MTTR: 1.66s = ~6s exposure",
+      "with_phase3": "MTTP: 0s — violation never reaches AWS"
+    }
+  }
+}

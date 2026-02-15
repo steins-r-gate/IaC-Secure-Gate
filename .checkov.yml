@@ -1,0 +1,71 @@
+# .checkov.yml — Checkov configuration for IaC-Secure-Gate
+# Phase 3: Pre-Deployment Security Gate
+#
+# Skip list documents intentional design decisions.
+# Every suppression has a justification — this demonstrates
+# deliberate risk acceptance, not negligence.
+
+framework:
+  - terraform
+
+directory:
+  - terraform/environments/dev
+
+download-external-modules: false
+evaluate-variables: true
+compact: true
+
+output:
+  - cli
+  - sarif
+
+soft-fail: false
+
+skip-check:
+  # Lambda: Reserved concurrency removed due to AWS account quota limits
+  # Affects: iam_remediation, s3_remediation, sg_remediation, analytics Lambda
+  - CKV_AWS_115
+
+  # Lambda: No VPC needed — functions call AWS APIs only
+  # VPC + NAT Gateway would cost ~$32/month (exceeds entire project budget)
+  - CKV_AWS_117
+
+  # CloudWatch Logs: Service-level encryption is sufficient
+  # KMS encryption adds API call costs; logs contain operational data, not secrets
+  - CKV_AWS_158
+
+  # S3: Bucket access logging disabled — CloudTrail bucket cannot log to itself
+  # Access is audited via CloudTrail management events instead
+  - CKV_AWS_18
+
+  # S3: Single-region project — cross-region replication adds cost and complexity
+  # Region is eu-west-1 only, enforced by Terraform variable validation
+  - CKV_AWS_144
+
+  # SNS: Uses alias/aws/sns (AWS managed key) — topics ARE encrypted, just not with custom KMS
+  # Custom KMS key adds ~$1/month per key; AWS managed key is free
+  - CKV_AWS_26
+
+  # SQS: Uses sqs_managed_sse_enabled (AES-256) instead of KMS
+  # AWS recommended default for DLQs; KMS would add ~$1/month per queue
+  - CKV_AWS_27
+
+  # DynamoDB: Uses AWS managed encryption (free) instead of customer-managed KMS
+  # CMK adds ~$1/month; remediation audit data is non-sensitive operational records
+  - CKV_AWS_119
+
+  # KMS: Root account principal with kms:* is the standard AWS pattern
+  # Required to delegate key management to IAM policies; without this, key becomes unmanageable
+  - CKV_AWS_33
+
+  # IAM: Wildcard resources used for actions that don't support resource-level permissions
+  # e.g., ec2:DescribeSecurityGroups, iam:ListPolicies — AWS requires Resource: "*"
+  - CKV_AWS_355
+
+  # IAM: Write actions use conditions (aws:ResourceTag, SourceAccount) but Checkov still flags
+  # Policies are scoped via inline attachment to specific Lambda roles
+  - CKV_AWS_290
+
+  # S3: Event notifications not used — CloudTrail provides complete audit coverage
+  # Also covers CloudTrail log group association (disabled in dev for cost savings)
+  - CKV_AWS_252
