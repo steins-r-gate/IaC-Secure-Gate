@@ -178,7 +178,7 @@ module "security_hub" {
   # Standards configuration
   enable_cis_standard           = true
   cis_standard_version          = var.cis_standard_version
-  enable_foundational_standard  = false # Disabled to reduce costs (~70% fewer Config rules)
+  enable_foundational_standard  = false   # Disabled to reduce costs (~70% fewer Config rules)
   foundational_standard_version = "1.0.0" # 200+ controls (not deployed when disabled)
 
   # Product integrations
