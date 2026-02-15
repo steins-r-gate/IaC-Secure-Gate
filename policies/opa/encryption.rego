@@ -7,14 +7,12 @@
 
 package main
 
-import rego.v1
-
 # ──────────────────────────────────────────────────────────────────
 # DENY: DynamoDB table without encryption specification
 # The project uses DynamoDB for remediation audit trails — data at
 # rest must be encrypted.
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_dynamodb_table"
 	resource.change.actions[_] == "create"
@@ -30,7 +28,7 @@ deny contains msg if {
 # ──────────────────────────────────────────────────────────────────
 # DENY: SQS queue without encryption
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_sqs_queue"
 	resource.change.actions[_] == "create"
@@ -50,7 +48,7 @@ deny contains msg if {
 # Warning level — CloudWatch encrypts by default with service keys,
 # but KMS provides customer-managed control.
 # ──────────────────────────────────────────────────────────────────
-warn contains msg if {
+warn[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_cloudwatch_log_group"
 	resource.change.actions[_] == "create"
@@ -68,7 +66,7 @@ warn contains msg if {
 # DENY: SNS topic without encryption
 # The project uses SNS for remediation notifications.
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_sns_topic"
 	resource.change.actions[_] == "create"
@@ -85,7 +83,7 @@ deny contains msg if {
 # ──────────────────────────────────────────────────────────────────
 # Helper: check DynamoDB SSE configuration
 # ──────────────────────────────────────────────────────────────────
-has_dynamodb_sse(resource) if {
+has_dynamodb_sse(resource) {
 	sse := resource.change.after.server_side_encryption[_]
 	sse.enabled == true
 }

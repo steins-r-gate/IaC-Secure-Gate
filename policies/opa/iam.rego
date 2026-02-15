@@ -9,7 +9,7 @@
 
 package main
 
-import rego.v1
+import future.keywords.in
 
 # ──────────────────────────────────────────────────────────────────
 # Dangerous action patterns — identical to Phase 2 Lambda
@@ -24,7 +24,7 @@ dangerous_actions := {
 # ──────────────────────────────────────────────────────────────────
 # DENY: IAM policies with wildcard actions on wildcard resources
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_iam_policy"
 	resource.change.after.policy != null
@@ -50,7 +50,7 @@ deny contains msg if {
 # ──────────────────────────────────────────────────────────────────
 # DENY: IAM role assume_role_policy with wildcard principals
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_iam_role"
 	resource.change.after.assume_role_policy != null
@@ -74,7 +74,7 @@ deny contains msg if {
 # WARN: IAM policies with wildcard actions on specific resources
 # Less severe than wildcard resource, but still risky
 # ──────────────────────────────────────────────────────────────────
-warn contains msg if {
+warn[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_iam_policy"
 	resource.change.after.policy != null
@@ -100,10 +100,10 @@ warn contains msg if {
 # ──────────────────────────────────────────────────────────────────
 # Helper: normalize value to array
 # ──────────────────────────────────────────────────────────────────
-as_array(value) := [value] if {
+as_array(value) = [value] {
 	is_string(value)
 }
 
-as_array(value) := value if {
+as_array(value) = value {
 	is_array(value)
 }

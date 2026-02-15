@@ -6,7 +6,7 @@
 
 package main
 
-import rego.v1
+import future.keywords.in
 
 # ──────────────────────────────────────────────────────────────────
 # Required tags for all taggable resources
@@ -32,7 +32,7 @@ taggable_resources := {
 # ──────────────────────────────────────────────────────────────────
 # DENY: Taggable resource missing required tags
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type in taggable_resources
 	resource.change.actions[_] == "create"
@@ -52,7 +52,7 @@ deny contains msg if {
 # Ensures all resources declare Terraform as the management tool,
 # preventing configuration drift from manual changes.
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type in taggable_resources
 	resource.change.actions[_] == "create"
@@ -72,7 +72,7 @@ deny contains msg if {
 # ──────────────────────────────────────────────────────────────────
 valid_environments := {"dev", "staging", "prod"}
 
-warn contains msg if {
+warn[msg] {
 	resource := input.resource_changes[_]
 	resource.type in taggable_resources
 	resource.change.actions[_] == "create"

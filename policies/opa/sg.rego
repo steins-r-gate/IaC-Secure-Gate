@@ -9,8 +9,6 @@
 
 package main
 
-import rego.v1
-
 # ──────────────────────────────────────────────────────────────────
 # Dangerous ports — identical to Phase 2 Lambda
 # Source: lambda/src/sg_remediation.py, Lines 214-226
@@ -34,7 +32,7 @@ dangerous_ports := {
 # Mirrors: sg_remediation.py → is_overly_permissive_rule() check for
 #          dangerous_ports with 0.0.0.0/0 source (Lines 213-232)
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_security_group"
 	rule := resource.change.after.ingress[_]
@@ -57,7 +55,7 @@ deny contains msg if {
 # ──────────────────────────────────────────────────────────────────
 # DENY: Security group ingress rule with dangerous port open to ::/0 (IPv6)
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_security_group"
 	rule := resource.change.after.ingress[_]
@@ -79,7 +77,7 @@ deny contains msg if {
 # DENY: Security group with all-traffic protocol (-1) open to public
 # Mirrors: sg_remediation.py L194 — protocol "-1" is always dangerous
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_security_group"
 	rule := resource.change.after.ingress[_]
@@ -95,7 +93,7 @@ deny contains msg if {
 	)
 }
 
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_security_group"
 	rule := resource.change.after.ingress[_]
@@ -115,7 +113,7 @@ deny contains msg if {
 # DENY: Standalone security group rules (aws_security_group_rule)
 # Same checks but for separate ingress rule resources
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_security_group_rule"
 	resource.change.after.type == "ingress"
@@ -137,7 +135,7 @@ deny contains msg if {
 # WARN: Wide port range open to public (>100 ports)
 # Mirrors: sg_remediation.py L210 — port range too wide
 # ──────────────────────────────────────────────────────────────────
-warn contains msg if {
+warn[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_security_group"
 	rule := resource.change.after.ingress[_]

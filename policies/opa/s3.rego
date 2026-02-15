@@ -10,14 +10,12 @@
 
 package main
 
-import rego.v1
-
 # ──────────────────────────────────────────────────────────────────
 # DENY: S3 bucket missing public access block
 # Mirrors: s3_remediation.py → block_public_access() (Lines 238-243)
 # All four settings must be true — identical to Phase 2 Lambda
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_public_access_block"
 	config := resource.change.after
@@ -30,7 +28,7 @@ deny contains msg if {
 	)
 }
 
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_public_access_block"
 	config := resource.change.after
@@ -43,7 +41,7 @@ deny contains msg if {
 	)
 }
 
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_public_access_block"
 	config := resource.change.after
@@ -56,7 +54,7 @@ deny contains msg if {
 	)
 }
 
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_public_access_block"
 	config := resource.change.after
@@ -73,7 +71,7 @@ deny contains msg if {
 # DENY: S3 bucket without a public access block resource
 # Every aws_s3_bucket should have a corresponding public access block
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket"
 	resource.change.actions[_] == "create"
@@ -92,7 +90,7 @@ deny contains msg if {
 # DENY: S3 bucket without server-side encryption
 # Mirrors: s3_remediation.py → enable_encryption() (Lines 258-287)
 # ──────────────────────────────────────────────────────────────────
-deny contains msg if {
+deny[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket"
 	resource.change.actions[_] == "create"
@@ -111,7 +109,7 @@ deny contains msg if {
 # WARN: S3 bucket without versioning
 # Mirrors: s3_remediation.py → enable_versioning() (Lines 290-309)
 # ──────────────────────────────────────────────────────────────────
-warn contains msg if {
+warn[msg] {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket"
 	resource.change.actions[_] == "create"
@@ -129,19 +127,19 @@ warn contains msg if {
 # ──────────────────────────────────────────────────────────────────
 # Helpers: check for companion resources
 # ──────────────────────────────────────────────────────────────────
-has_public_access_block(bucket_name) if {
+has_public_access_block(bucket_name) {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_public_access_block"
 	contains(resource.address, bucket_name)
 }
 
-has_encryption_config(bucket_name) if {
+has_encryption_config(bucket_name) {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_server_side_encryption_configuration"
 	contains(resource.address, bucket_name)
 }
 
-has_versioning(bucket_name) if {
+has_versioning(bucket_name) {
 	resource := input.resource_changes[_]
 	resource.type == "aws_s3_bucket_versioning"
 	contains(resource.address, bucket_name)
