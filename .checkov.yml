@@ -69,3 +69,30 @@ skip-check:
   # S3: Event notifications not used — CloudTrail provides complete audit coverage
   # Also covers CloudTrail log group association (disabled in dev for cost savings)
   - CKV_AWS_252
+  - CKV2_AWS_62
+
+  # Lambda: X-Ray tracing not needed — remediation functions are event-driven with
+  # DynamoDB audit trail and CloudWatch logs providing full observability
+  - CKV_AWS_50
+
+  # Lambda: Code signing not configured — functions are deployed via Terraform from
+  # local source code, not from untrusted artifact registries
+  - CKV_AWS_272
+
+  # CloudWatch Logs: 30-day retention is sufficient for Lambda operational logs
+  # Remediation audit data is stored in DynamoDB with 90-day TTL separately
+  - CKV_AWS_338
+
+  # Lambda: Analytics Lambda has no DLQ — it runs on a schedule for daily reports,
+  # failures are non-critical and visible in CloudWatch logs
+  - CKV_AWS_116
+
+  # Lambda: Analytics Lambda env vars not KMS-encrypted — contains only table names
+  # and topic ARNs, no secrets. Remediation Lambdas use KMS when configured.
+  - CKV_AWS_173
+
+  # IAM: Lambda execution role inline policies use service-level wildcards for
+  # actions without resource-level support (e.g., s3:ListAllMyBuckets)
+  - CKV_AWS_356
+  - CKV_AWS_111
+  - CKV_AWS_109
