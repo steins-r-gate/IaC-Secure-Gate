@@ -139,8 +139,8 @@ variable "bucket_logging_target_bucket" {
   default     = null
 
   validation {
-    condition     = var.enable_bucket_logging == false || (var.enable_bucket_logging == true && var.bucket_logging_target_bucket != null)
-    error_message = "bucket_logging_target_bucket must be provided when enable_bucket_logging is true."
+    condition     = var.bucket_logging_target_bucket == null || can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.bucket_logging_target_bucket))
+    error_message = "bucket_logging_target_bucket must be a valid S3 bucket name if provided."
   }
 }
 
