@@ -168,15 +168,57 @@ def send_slack_message(blocks, text_fallback):
     return body
 
 
+def send_timeout_notification(control_id, resource_arn, severity):
+    """Send a notification that approval timed out and auto-remediation was triggered."""
+    severity_emoji = {
+        "CRITICAL": ":rotating_light:",
+        "HIGH": ":warning:",
+        "MEDIUM": ":large_orange_diamond:",
+        "LOW": ":information_source:",
+    }.get(severity, ":question:")
+
+    text = (
+        f":alarm_clock: *Approval timed out — auto-remediating*\n"
+        f"{severity_emoji} *Control:* {control_id}\n"
+        f"*Resource:* `{resource_arn}`\n"
+        f"No response within the approval window. Remediation has been triggered automatically."
+    )
+    blocks = [
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": text},
+        }
+    ]
+    send_slack_message(blocks, text)
+
+
 def lambda_handler(event, context):
     """
-    Entry point. Expected input:
+    Entry point. Handles two message types:
+
+    Approval request (Phase 2 HITL):
     {
         "task_token": "<SFN task token>",
         "finding": { ...Security Hub finding detail... }
     }
+
+    Timeout notification:
+    {
+        "message_type": "timeout_notification",
+        "control_id": "S3.2",
+        "resource_arn": "arn:aws:s3:::bucket",
+        "severity": "MEDIUM"
+    }
     """
     logger.info("Received event: %s", json.dumps(event, default=str)[:2000])
+
+    if event.get("message_type") == "timeout_notification":
+        send_timeout_notification(
+            control_id=event.get("control_id", "Unknown"),
+            resource_arn=event.get("resource_arn", "Unknown"),
+            severity=event.get("severity", "UNKNOWN"),
+        )
+        return {"statusCode": 200, "body": {"message": "Timeout notification sent"}}
 
     task_token = event.get("task_token", "")
     finding_detail = event.get("finding", {})

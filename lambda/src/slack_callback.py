@@ -134,12 +134,38 @@ def update_original_message(channel_id, message_ts, action, user_info):
 
 # ── Business logic ────────────────────────────────────────────────────
 
+def register_false_positive(resource_arn, control_id, username):
+    """Write a false positive entry to DynamoDB so future findings are auto-skipped."""
+    if not DYNAMODB_TABLE or not resource_arn or not control_id:
+        return
+    now = datetime.now(timezone.utc)
+    ttl_seconds = 90 * 24 * 60 * 60  # 90 days
+    table = dynamodb.Table(DYNAMODB_TABLE)
+    table.put_item(Item={
+        "violation_type": "FALSE_POSITIVE",
+        "timestamp": now.isoformat(),
+        "resource_arn": resource_arn,
+        "control_id": control_id,
+        "marked_by": username,
+        "environment": ENVIRONMENT,
+        "expiration_time": int(now.timestamp()) + ttl_seconds,
+    })
+    logger.info("False positive registered: resource=%s, control=%s", resource_arn, control_id)
+
+
 def handle_phase2_callback(action_data, user_info):
     task_token = action_data.get("task_token", "")
     action = action_data.get("action", "")
 
     if not task_token:
         raise ValueError("Missing task_token in action data")
+
+    if action == "FALSE_POSITIVE":
+        register_false_positive(
+            resource_arn=action_data.get("resource_arn", ""),
+            control_id=action_data.get("control_id", ""),
+            username=user_info.get("username", "unknown"),
+        )
 
     sfn_client.send_task_success(
         taskToken=task_token,

@@ -260,7 +260,7 @@ resource "aws_sfn_state_machine" "hitl_orchestrator" {
         Catch = [
           {
             ErrorEquals = ["States.Timeout"]
-            Next        = "TimeoutAutoRemediate"
+            Next        = "TimeoutNotifySlack"
             ResultPath  = "$.error"
           },
           {
@@ -288,11 +288,28 @@ resource "aws_sfn_state_machine" "hitl_orchestrator" {
         Default = "SelectRemediationLambda"
       }
 
-      # ── Timeout: auto-remediate with notification ──────────────
-      TimeoutAutoRemediate = {
-        Type    = "Pass"
-        Comment = "Approval timed out — proceeding with auto-remediation"
-        Next    = "SelectRemediationLambda"
+      # ── Timeout: notify Slack then auto-remediate ──────────────
+      TimeoutNotifySlack = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::lambda:invoke"
+        Parameters = {
+          FunctionName = var.slack_notifier_lambda_arn
+          Payload = {
+            "message_type"  = "timeout_notification"
+            "control_id.$"  = "$.triage.control_id"
+            "resource_arn.$" = "$.triage.resource_arn"
+            "severity.$"    = "$.triage.severity"
+          }
+        }
+        ResultPath = null
+        Next       = "SelectRemediationLambda"
+        Catch = [
+          {
+            ErrorEquals = ["States.ALL"]
+            Next        = "SelectRemediationLambda"
+            ResultPath  = "$.timeout_error"
+          }
+        ]
       }
 
       # ── False positive: log and succeed ────────────────────────
