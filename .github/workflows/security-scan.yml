@@ -1,11 +1,12 @@
 # .github/workflows/security-scan.yml
 # Phase 3: IaC Security Gate — Pre-Deployment Security Scanning
 #
-# 4-job pipeline: validate → (parallel) checkov + opa → pr-comment
-# Total wall-clock time: ~2 minutes
+# 5-job pipeline: validate → (parallel) checkov + opa → slack-approval → pr-comment
+# Total wall-clock time: ~2 minutes (up to ~32 minutes if Slack approval needed)
 #
 # Implements the feedback loop: Phase 2 runtime remediation patterns
 # are encoded as Phase 3 commit-time prevention policies.
+# HITL: When violations are non-critical, a Slack approval can override the gate.
 
 name: Security Scan
 
@@ -152,6 +153,18 @@ jobs:
             echo "status=success" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Collect violation details
+        id: violations
+        if: always()
+        run: |
+          if [ -f checkov-output.txt ]; then
+            # Extract FAILED check lines for Slack notification
+            VIOLATIONS=$(grep "FAILED" checkov-output.txt | head -20 | tr '\n' '|' || true)
+            echo "details=$VIOLATIONS" >> "$GITHUB_OUTPUT"
+          else
+            echo "details=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Fail if checks failed
         if: steps.parse.outputs.status == 'failure'
         run: exit 1
@@ -161,6 +174,7 @@ jobs:
       passed: ${{ steps.parse.outputs.passed }}
       failed: ${{ steps.parse.outputs.failed }}
       skipped: ${{ steps.parse.outputs.skipped }}
+      violations: ${{ steps.violations.outputs.details }}
 
   # ================================================================
   # Job 3: OPA/Conftest (~90s)
@@ -245,6 +259,17 @@ jobs:
             echo "status=success" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Collect violation details
+        id: violations
+        if: always()
+        run: |
+          if [ -f conftest-output.txt ]; then
+            VIOLATIONS=$(grep -E "^(FAIL|WARN)" conftest-output.txt | head -20 | tr '\n' '|' || true)
+            echo "details=$VIOLATIONS" >> "$GITHUB_OUTPUT"
+          else
+            echo "details=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload Conftest results as artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -264,15 +289,139 @@ jobs:
       status: ${{ steps.parse.outputs.status }}
       failures: ${{ steps.parse.outputs.failures }}
       warnings: ${{ steps.parse.outputs.warnings }}
+      violations: ${{ steps.violations.outputs.details }}
 
   # ================================================================
-  # Job 4: PR Comment (~10s)
-  # Aggregates results from all 3 checks and posts summary to PR
+  # Job 4: Slack Approval (up to ~30 minutes)
+  # Sends override request to Slack when violations are non-critical
+  # Polls DynamoDB for approval status
+  # ================================================================
+  slack-approval:
+    name: Slack Approval
+    runs-on: ubuntu-latest
+    needs: [checkov-scan, opa-conftest]
+    if: |
+      always() &&
+      github.event_name == 'pull_request' &&
+      (needs.opa-conftest.outputs.warnings != '0' ||
+       (needs.checkov-scan.outputs.status == 'failure' && needs.checkov-scan.outputs.failed != '0'))
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-west-1
+
+    steps:
+      - name: Generate approval ID
+        id: approval
+        run: |
+          APPROVAL_ID=$(uuidgen)
+          echo "id=$APPROVAL_ID" >> "$GITHUB_OUTPUT"
+          echo "Generated approval ID: $APPROVAL_ID"
+
+      - name: Collect violations for Slack
+        id: collect
+        run: |
+          VIOLATIONS=""
+          CHECKOV_VIOLATIONS="${{ needs.checkov-scan.outputs.violations }}"
+          OPA_VIOLATIONS="${{ needs.opa-conftest.outputs.violations }}"
+
+          # Convert pipe-delimited back to JSON array
+          VIOLATIONS_JSON="["
+          FIRST=true
+          IFS='|' read -ra ITEMS <<< "${CHECKOV_VIOLATIONS}${OPA_VIOLATIONS}"
+          for item in "${ITEMS[@]}"; do
+            if [ -n "$item" ]; then
+              # Escape quotes for JSON
+              ESCAPED=$(echo "$item" | sed 's/"/\\"/g' | tr -d '\n')
+              if [ "$FIRST" = true ]; then
+                FIRST=false
+              else
+                VIOLATIONS_JSON="$VIOLATIONS_JSON,"
+              fi
+              VIOLATIONS_JSON="$VIOLATIONS_JSON\"$ESCAPED\""
+            fi
+          done
+          VIOLATIONS_JSON="$VIOLATIONS_JSON]"
+
+          echo "json=$VIOLATIONS_JSON" >> "$GITHUB_OUTPUT"
+
+      - name: Invoke CI gate notifier Lambda
+        id: notify
+        run: |
+          PAYLOAD=$(cat <<EOF
+          {
+            "approval_id": "${{ steps.approval.outputs.id }}",
+            "pr_number": ${{ github.event.pull_request.number }},
+            "pr_url": "${{ github.event.pull_request.html_url }}",
+            "violations": ${{ steps.collect.outputs.json }}
+          }
+          EOF
+          )
+
+          aws lambda invoke \
+            --function-name "iam-secure-gate-dev-ci-gate-notifier" \
+            --payload "$(echo "$PAYLOAD" | base64 -w0)" \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/lambda-response.json
+
+          cat /tmp/lambda-response.json
+          echo "Slack notification sent"
+
+      - name: Poll DynamoDB for approval
+        id: poll
+        run: |
+          APPROVAL_ID="${{ steps.approval.outputs.id }}"
+          TABLE_NAME="iam-secure-gate-dev-remediation-history"
+          MAX_ATTEMPTS=60  # 30 minutes at 30s intervals
+          ATTEMPT=0
+          STATUS="PENDING"
+
+          echo "Polling for approval: $APPROVAL_ID"
+          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+
+            # Query DynamoDB by approval_id GSI
+            RESULT=$(aws dynamodb query \
+              --table-name "$TABLE_NAME" \
+              --index-name "approval-id-index" \
+              --key-condition-expression "approval_id = :aid" \
+              --expression-attribute-values "{\":aid\":{\"S\":\"$APPROVAL_ID\"}}" \
+              --query "Items[0].status.S" \
+              --output text 2>/dev/null || echo "PENDING")
+
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: status=$RESULT"
+
+            if [ "$RESULT" = "APPROVED" ]; then
+              echo "override=true" >> "$GITHUB_OUTPUT"
+              echo "status=APPROVED" >> "$GITHUB_OUTPUT"
+              echo "Approval granted!"
+              exit 0
+            elif [ "$RESULT" = "REJECTED" ]; then
+              echo "override=false" >> "$GITHUB_OUTPUT"
+              echo "status=REJECTED" >> "$GITHUB_OUTPUT"
+              echo "Approval rejected."
+              exit 0
+            fi
+
+            sleep 30
+          done
+
+          echo "override=false" >> "$GITHUB_OUTPUT"
+          echo "status=TIMEOUT" >> "$GITHUB_OUTPUT"
+          echo "Approval timed out after 30 minutes."
+
+    outputs:
+      override: ${{ steps.poll.outputs.override }}
+      status: ${{ steps.poll.outputs.status }}
+
+  # ================================================================
+  # Job 5: PR Comment (~10s)
+  # Aggregates results from all checks and posts summary to PR
   # ================================================================
   pr-comment:
     name: PR Comment
     runs-on: ubuntu-latest
-    needs: [terraform-validate, checkov-scan, opa-conftest]
+    needs: [terraform-validate, checkov-scan, opa-conftest, slack-approval]
     if: always() && github.event_name == 'pull_request'
     permissions:
       pull-requests: write
@@ -297,8 +446,27 @@ jobs:
             const fmtOutcome = '${{ needs.terraform-validate.outputs.fmt-outcome }}';
             const validateOutcome = '${{ needs.terraform-validate.outputs.validate-outcome }}';
 
+            // HITL override status
+            const slackOverride = '${{ needs.slack-approval.outputs.override }}';
+            const slackStatus = '${{ needs.slack-approval.outputs.status }}';
+            const hitlRequested = slackStatus !== '';
+
             const icon = (status) => status === 'success' ? ':white_check_mark:' : ':x:';
-            const allPassed = validate === 'success' && checkov === 'success' && opa === 'success';
+            const scansPassed = validate === 'success' && checkov === 'success' && opa === 'success';
+            const overrideApproved = slackOverride === 'true';
+            const allPassed = scansPassed || overrideApproved;
+
+            // Build HITL status line
+            let hitlLine = '';
+            if (hitlRequested) {
+              const hitlIcon = overrideApproved ? ':white_check_mark:' : ':x:';
+              const hitlDetail = {
+                'APPROVED': 'Override approved via Slack',
+                'REJECTED': 'Override rejected via Slack',
+                'TIMEOUT': 'Override timed out (30 min)',
+              }[slackStatus] || 'Unknown';
+              hitlLine = `| **Slack HITL Override** | ${hitlIcon} | ${hitlDetail} |`;
+            }
 
             const body = [
               `## ${allPassed ? ':white_check_mark:' : ':x:'} Security Scan Results`,
@@ -309,15 +477,18 @@ jobs:
               `| **Terraform Validate** | ${icon(validateOutcome)} | ${validateOutcome === 'success' ? 'Configuration valid' : 'Validation errors'} |`,
               `| **Checkov** | ${icon(checkov)} | ${checkovPassed} passed, ${checkovFailed} failed, ${checkovSkipped} skipped |`,
               `| **OPA/Conftest** | ${icon(opa)} | ${opaFailures} deny violations, ${opaWarnings} warnings |`,
+              hitlLine,
               '',
               '### Gate Decision',
               allPassed
-                ? ':white_check_mark: **All security checks passed.** This PR is safe to merge.'
+                ? (overrideApproved
+                  ? ':white_check_mark: **Security violations overridden via Slack HITL approval.** This PR may be merged.'
+                  : ':white_check_mark: **All security checks passed.** This PR is safe to merge.')
                 : ':x: **Security violations detected.** Fix the issues above before merging.',
               '',
               '---',
-              '<sub>Phase 3: IaC Security Gate | Checkov (1000+ checks) + OPA/Rego (7 custom policies)</sub>',
-            ].join('\n');
+              '<sub>Phase 3: IaC Security Gate + HITL | Checkov (1000+ checks) + OPA/Rego (7 custom policies) + Slack approval</sub>',
+            ].filter(line => line !== '').join('\n');
 
             // Find existing bot comment to update (avoids spam on re-pushes)
             const { data: comments } = await github.rest.issues.listComments({

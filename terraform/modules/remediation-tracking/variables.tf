@@ -132,3 +132,9 @@ variable "enable_status_index" {
   type        = bool
   default     = true
 }
+
+variable "enable_approval_index" {
+  description = "Enable GSI for querying by approval ID (required for HITL CI gate)"
+  type        = bool
+  default     = false
+}

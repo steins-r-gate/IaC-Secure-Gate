@@ -182,7 +182,7 @@ resource "aws_s3_bucket_logging" "config" {
 
   bucket = aws_s3_bucket.config.id
 
-  target_bucket = var.bucket_logging_target_bucket
+  target_bucket = local.logging_target_bucket
   target_prefix = "${var.bucket_logging_target_prefix}config/"
 }
 

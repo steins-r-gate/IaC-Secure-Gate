@@ -46,6 +46,15 @@ output "sg_rule_arn" {
 }
 
 # ==================================================================
+# HITL Outputs
+# ==================================================================
+
+output "eventbridge_sfn_role_arn" {
+  description = "ARN of the EventBridge-to-SFN IAM role (null if HITL disabled)"
+  value       = var.enable_hitl ? aws_iam_role.eventbridge_sfn[0].arn : null
+}
+
+# ==================================================================
 # Module Summary
 # ==================================================================
 

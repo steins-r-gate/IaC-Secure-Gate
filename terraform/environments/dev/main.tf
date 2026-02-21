@@ -48,11 +48,23 @@ locals {
 
   common_tags = {
     Project     = "IaC-Secure-Gate"
-    Phase       = "Phase-1-2"
+    Phase       = "Phase-1-2-HITL"
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner_email
   }
+}
+
+# ==================================================================
+# Account Baseline (S3.1, EC2.7, IAM.15, EC2.6)
+# ==================================================================
+
+module "account_baseline" {
+  source = "../../modules/account-baseline"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
 }
 
 # ==================================================================
@@ -70,6 +82,9 @@ module "foundation" {
   # Retention settings (configured via variables)
   cloudtrail_log_retention_days  = var.cloudtrail_log_retention_days
   config_snapshot_retention_days = var.config_snapshot_retention_days
+
+  # S3 access logging (CloudTrail.7)
+  enable_bucket_logging = true
 }
 
 # CloudTrail Module (Audit Logging)
@@ -90,8 +105,8 @@ module "cloudtrail" {
   is_multi_region_trail         = true # CIS 3.1
   include_global_service_events = true # Capture IAM events in home region
 
-  # Optional features (disabled by default to minimize costs in dev)
-  enable_cloudwatch_logs    = false
+  # CloudTrail.5: CloudWatch Logs integration for CIS compliance
+  enable_cloudwatch_logs    = true
   enable_sns_notifications  = false
   enable_insights           = false
   enable_s3_data_events     = false
@@ -118,6 +133,9 @@ module "config" {
   config_bucket_name        = module.foundation.config_bucket_name
   config_bucket_arn         = module.foundation.config_bucket_arn
   config_bucket_kms_key_arn = module.foundation.kms_key_arn
+
+  # Config.1: Use service-linked role for CIS compliance
+  use_service_linked_role = true
 
   # Config recorder settings
   is_primary_region             = true # Record global resources (IAM, etc.) in this region
@@ -275,6 +293,10 @@ module "eventbridge_remediation" {
   enable_s3_rule  = true
   enable_sg_rule  = true
 
+  # HITL: Route findings through Step Functions for human approval
+  enable_hitl        = var.enable_hitl
+  step_functions_arn = var.enable_hitl ? module.step_functions_hitl[0].state_machine_arn : ""
+
   # Retry configuration
   retry_attempts            = 2
   maximum_event_age_seconds = 3600 # 1 hour
@@ -303,8 +325,9 @@ module "remediation_tracking" {
   ttl_days    = 90
 
   # Global Secondary Indexes for efficient queries
-  enable_resource_index = true # Query by resource ARN
-  enable_status_index   = true # Query by remediation status
+  enable_resource_index = true            # Query by resource ARN
+  enable_status_index   = true            # Query by remediation status
+  enable_approval_index = var.enable_hitl # Query by approval ID (HITL CI gate)
 
   # Use AWS managed encryption (free)
   kms_key_arn = null
@@ -344,4 +367,91 @@ module "self_improvement" {
   depends_on = [
     module.remediation_tracking
   ]
+}
+
+# ==================================================================
+# HITL Modules (Human-in-the-Loop Slack Approval Workflows)
+# ==================================================================
+
+# Slack Integration Module (API Gateway + Lambdas + SSM)
+module "slack_integration" {
+  source = "../../modules/slack-integration"
+  count  = var.enable_hitl ? 1 : 0
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Slack credentials (stored in SSM SecureString)
+  slack_bot_token      = var.slack_bot_token
+  slack_signing_secret = var.slack_signing_secret
+  slack_channel_id     = var.slack_channel_id
+
+  # DynamoDB for CI gate approvals
+  dynamodb_table_name = module.remediation_tracking.table_name
+  dynamodb_table_arn  = module.remediation_tracking.table_arn
+
+  # Lambda configuration
+  lambda_runtime            = "python3.12"
+  lambda_timeout            = 30
+  lambda_memory_size        = 256
+  lambda_log_retention_days = 30
+
+  depends_on = [
+    module.remediation_tracking
+  ]
+}
+
+# Step Functions HITL Orchestrator (Triage → Approval → Remediation)
+module "step_functions_hitl" {
+  source = "../../modules/step-functions-hitl"
+  count  = var.enable_hitl ? 1 : 0
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  # Existing remediation Lambda ARNs
+  iam_remediation_lambda_arn = module.lambda_remediation.iam_remediation_function_arn
+  s3_remediation_lambda_arn  = module.lambda_remediation.s3_remediation_function_arn
+  sg_remediation_lambda_arn  = module.lambda_remediation.sg_remediation_function_arn
+
+  # Slack notifier for approval requests
+  slack_notifier_lambda_arn = module.slack_integration[0].slack_notifier_function_arn
+
+  # DynamoDB for false positive registry
+  dynamodb_table_name = module.remediation_tracking.table_name
+  dynamodb_table_arn  = module.remediation_tracking.table_arn
+
+  # HITL configuration
+  approval_timeout_seconds = 14400  # 4 hours
+  auto_remediate_severity  = "HIGH" # AUTO_REMEDIATE for HIGH+CRITICAL
+
+  # Lambda configuration
+  lambda_runtime            = "python3.12"
+  lambda_timeout            = 30
+  lambda_memory_size        = 256
+  lambda_log_retention_days = 30
+
+  depends_on = [
+    module.lambda_remediation,
+    module.slack_integration
+  ]
+}
+
+# ==================================================================
+# CIS Alarms (CloudWatch.1,4,5,6,7,10,11,12,13,14)
+# ==================================================================
+
+module "cis_alarms" {
+  source = "../../modules/cis-alarms"
+
+  environment  = local.environment
+  project_name = local.project_name
+  common_tags  = local.common_tags
+
+  cloudtrail_log_group_name = module.cloudtrail.cloudwatch_logs_group_name
+  alarm_sns_topic_arns      = [module.self_improvement.remediation_alerts_topic_arn]
+
+  depends_on = [module.cloudtrail]
 }

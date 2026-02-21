@@ -27,7 +27,7 @@ locals {
 
 resource "aws_config_configuration_recorder" "main" {
   name     = "${local.config_name}-recorder"
-  role_arn = aws_iam_role.config.arn
+  role_arn = local.config_role_arn
 
   recording_group {
     all_supported = true
@@ -36,7 +36,9 @@ resource "aws_config_configuration_recorder" "main" {
   }
 
   # Ensure IAM role and all policies are attached before creating recorder
+  # (only relevant when using custom role, not SLR)
   depends_on = [
+    aws_iam_role.config,
     aws_iam_role_policy_attachment.config,
     aws_iam_role_policy.config_s3,
     aws_iam_role_policy.config_kms
@@ -78,6 +80,7 @@ resource "aws_config_configuration_recorder_status" "main" {
   # 3. S3 bucket is configured (handled by foundation module)
   depends_on = [
     aws_config_delivery_channel.main,
+    aws_iam_role.config,
     aws_iam_role_policy_attachment.config,
     aws_iam_role_policy.config_s3,
     aws_iam_role_policy.config_kms

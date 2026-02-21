@@ -50,13 +50,28 @@ resource "aws_cloudwatch_event_rule" "iam_wildcard" {
 }
 
 resource "aws_cloudwatch_event_target" "iam_wildcard_lambda" {
-  count = var.enable_iam_rule ? 1 : 0
+  count = var.enable_iam_rule && !var.enable_hitl ? 1 : 0
 
   rule      = aws_cloudwatch_event_rule.iam_wildcard[0].name
   target_id = "IAMRemediationLambda"
   arn       = var.iam_remediation_lambda_arn
 
   # Retry configuration
+  retry_policy {
+    maximum_retry_attempts       = var.retry_attempts
+    maximum_event_age_in_seconds = var.maximum_event_age_seconds
+  }
+}
+
+# HITL target: route to Step Functions instead of direct Lambda
+resource "aws_cloudwatch_event_target" "iam_wildcard_sfn" {
+  count = var.enable_iam_rule && var.enable_hitl ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.iam_wildcard[0].name
+  target_id = "IAMRemediationSFN"
+  arn       = var.step_functions_arn
+  role_arn  = aws_iam_role.eventbridge_sfn[0].arn
+
   retry_policy {
     maximum_retry_attempts       = var.retry_attempts
     maximum_event_age_in_seconds = var.maximum_event_age_seconds
@@ -114,11 +129,26 @@ resource "aws_cloudwatch_event_rule" "s3_public" {
 }
 
 resource "aws_cloudwatch_event_target" "s3_public_lambda" {
-  count = var.enable_s3_rule ? 1 : 0
+  count = var.enable_s3_rule && !var.enable_hitl ? 1 : 0
 
   rule      = aws_cloudwatch_event_rule.s3_public[0].name
   target_id = "S3RemediationLambda"
   arn       = var.s3_remediation_lambda_arn
+
+  retry_policy {
+    maximum_retry_attempts       = var.retry_attempts
+    maximum_event_age_in_seconds = var.maximum_event_age_seconds
+  }
+}
+
+# HITL target: route to Step Functions instead of direct Lambda
+resource "aws_cloudwatch_event_target" "s3_public_sfn" {
+  count = var.enable_s3_rule && var.enable_hitl ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.s3_public[0].name
+  target_id = "S3RemediationSFN"
+  arn       = var.step_functions_arn
+  role_arn  = aws_iam_role.eventbridge_sfn[0].arn
 
   retry_policy {
     maximum_retry_attempts       = var.retry_attempts
@@ -171,11 +201,26 @@ resource "aws_cloudwatch_event_rule" "sg_open" {
 }
 
 resource "aws_cloudwatch_event_target" "sg_open_lambda" {
-  count = var.enable_sg_rule ? 1 : 0
+  count = var.enable_sg_rule && !var.enable_hitl ? 1 : 0
 
   rule      = aws_cloudwatch_event_rule.sg_open[0].name
   target_id = "SGRemediationLambda"
   arn       = var.sg_remediation_lambda_arn
+
+  retry_policy {
+    maximum_retry_attempts       = var.retry_attempts
+    maximum_event_age_in_seconds = var.maximum_event_age_seconds
+  }
+}
+
+# HITL target: route to Step Functions instead of direct Lambda
+resource "aws_cloudwatch_event_target" "sg_open_sfn" {
+  count = var.enable_sg_rule && var.enable_hitl ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.sg_open[0].name
+  target_id = "SGRemediationSFN"
+  arn       = var.step_functions_arn
+  role_arn  = aws_iam_role.eventbridge_sfn[0].arn
 
   retry_policy {
     maximum_retry_attempts       = var.retry_attempts

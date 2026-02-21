@@ -121,9 +121,9 @@ resource "aws_iam_role_policy" "analytics_sns" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SNSPublish"
-        Effect = "Allow"
-        Action = "sns:Publish"
+        Sid      = "SNSPublish"
+        Effect   = "Allow"
+        Action   = "sns:Publish"
         Resource = aws_sns_topic.analytics_reports[0].arn
       }
     ]

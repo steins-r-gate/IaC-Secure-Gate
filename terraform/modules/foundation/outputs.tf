@@ -95,6 +95,15 @@ output "config_bucket_region" {
 }
 
 # ==================================================================
+# Access Logs Bucket Outputs
+# ==================================================================
+
+output "access_logs_bucket_name" {
+  description = "Name of the S3 access logs bucket (null if not created)"
+  value       = var.enable_bucket_logging && var.bucket_logging_target_bucket == null ? aws_s3_bucket.access_logs[0].id : null
+}
+
+# ==================================================================
 # Configuration Summary (Structured Output)
 # ==================================================================
 

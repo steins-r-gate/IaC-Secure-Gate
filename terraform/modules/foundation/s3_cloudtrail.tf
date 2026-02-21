@@ -182,7 +182,7 @@ resource "aws_s3_bucket_logging" "cloudtrail" {
 
   bucket = aws_s3_bucket.cloudtrail.id
 
-  target_bucket = var.bucket_logging_target_bucket
+  target_bucket = local.logging_target_bucket
   target_prefix = "${var.bucket_logging_target_prefix}cloudtrail/"
 }
 

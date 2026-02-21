@@ -60,6 +60,11 @@ output "status_index_name" {
   value       = var.enable_status_index ? "status-index" : null
 }
 
+output "approval_id_index_name" {
+  description = "Name of the GSI for querying by approval ID"
+  value       = var.enable_approval_index ? "approval-id-index" : null
+}
+
 # ----------------------------------------------------------------------
 # CloudWatch Alarm Outputs
 # ----------------------------------------------------------------------

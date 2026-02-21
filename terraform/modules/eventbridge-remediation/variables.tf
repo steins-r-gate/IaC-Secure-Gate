@@ -91,6 +91,22 @@ variable "enable_sg_rule" {
 }
 
 # ==================================================================
+# HITL (Human-in-the-Loop) Configuration
+# ==================================================================
+
+variable "enable_hitl" {
+  description = "Enable HITL workflow — routes findings to Step Functions instead of direct Lambda"
+  type        = bool
+  default     = false
+}
+
+variable "step_functions_arn" {
+  description = "ARN of the HITL Step Functions state machine (required if enable_hitl = true)"
+  type        = string
+  default     = ""
+}
+
+# ==================================================================
 # Retry Configuration
 # ==================================================================
 

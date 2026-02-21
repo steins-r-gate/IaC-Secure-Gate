@@ -48,6 +48,15 @@ resource "aws_dynamodb_table" "remediation_history" {
     type = "S"
   }
 
+  # Approval ID attribute (for HITL CI gate lookups)
+  dynamic "attribute" {
+    for_each = var.enable_approval_index ? [1] : []
+    content {
+      name = "approval_id"
+      type = "S"
+    }
+  }
+
   # GSI1: Query by resource ARN (find all remediations for a specific resource)
   dynamic "global_secondary_index" {
     for_each = var.enable_resource_index ? [1] : []
@@ -70,6 +79,19 @@ resource "aws_dynamodb_table" "remediation_history" {
       name            = "status-index"
       hash_key        = "status"
       range_key       = "timestamp"
+      projection_type = "ALL"
+
+      read_capacity  = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
+      write_capacity = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
+    }
+  }
+
+  # GSI3: Query by approval ID (for CI gate polling)
+  dynamic "global_secondary_index" {
+    for_each = var.enable_approval_index ? [1] : []
+    content {
+      name            = "approval-id-index"
+      hash_key        = "approval_id"
       projection_type = "ALL"
 
       read_capacity  = var.billing_mode == "PROVISIONED" ? var.read_capacity : null

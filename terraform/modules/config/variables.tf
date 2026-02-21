@@ -159,6 +159,16 @@ variable "sns_topic_arn" {
 }
 
 # ==================================================================
+# Service-Linked Role (CIS Config.1)
+# ==================================================================
+
+variable "use_service_linked_role" {
+  description = "Use the AWS-managed service-linked role for Config instead of a custom role (CIS Config.1)"
+  type        = bool
+  default     = false
+}
+
+# ==================================================================
 # Deprecated Variables (for backward compatibility)
 # ==================================================================
 

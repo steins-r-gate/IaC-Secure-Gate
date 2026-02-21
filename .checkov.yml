@@ -34,8 +34,8 @@ skip-check:
   # KMS encryption adds API call costs; logs contain operational data, not secrets
   - CKV_AWS_158
 
-  # S3: Bucket access logging disabled — CloudTrail bucket cannot log to itself
-  # Access is audited via CloudTrail management events instead
+  # S3: Access logs bucket does not log to itself (would create infinite loop)
+  # The access logs bucket receives logs from CloudTrail and Config buckets
   - CKV_AWS_18
 
   # S3: Single-region project — cross-region replication adds cost and complexity
@@ -96,3 +96,15 @@ skip-check:
   - CKV_AWS_356
   - CKV_AWS_111
   - CKV_AWS_109
+
+  # S3: Access logs bucket uses BucketOwnerPreferred — required by S3 log delivery service
+  # BucketOwnerEnforced (which Checkov wants) blocks the logging.s3.amazonaws.com service
+  - CKV2_AWS_65
+
+  # S3: Access logs bucket uses SSE-S3 (AES256) — S3 access logging does not support
+  # KMS-encrypted destination buckets; this is an AWS service limitation
+  - CKV_AWS_145
+
+  # CloudTrail: Checkov cannot evaluate count-gated CloudWatch Logs integration statically
+  # CloudWatch Logs IS enabled via enable_cloudwatch_logs = true in dev/main.tf
+  - CKV2_AWS_10

@@ -43,17 +43,17 @@ output "recorder_status_enabled" {
 
 output "config_role_arn" {
   description = "IAM role ARN used by AWS Config"
-  value       = aws_iam_role.config.arn
+  value       = local.config_role_arn
 }
 
 output "config_role_name" {
-  description = "IAM role name used by AWS Config"
-  value       = aws_iam_role.config.name
+  description = "IAM role name used by AWS Config (null when using SLR)"
+  value       = var.use_service_linked_role ? null : aws_iam_role.config[0].name
 }
 
 output "config_role_id" {
-  description = "IAM role ID used by AWS Config"
-  value       = aws_iam_role.config.id
+  description = "IAM role ID used by AWS Config (null when using SLR)"
+  value       = var.use_service_linked_role ? null : aws_iam_role.config[0].id
 }
 
 # ==================================================================

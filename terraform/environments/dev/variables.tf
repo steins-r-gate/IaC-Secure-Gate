@@ -68,3 +68,33 @@ variable "cis_standard_version" {
     error_message = "CIS standard version must be one of: 1.2.0, 1.4.0, 3.0.0."
   }
 }
+
+# ==================================================================
+# HITL (Human-in-the-Loop) Variables
+# ==================================================================
+
+variable "slack_bot_token" {
+  description = "Slack Bot User OAuth Token (xoxb-...)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "slack_signing_secret" {
+  description = "Slack app signing secret for request verification"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "slack_channel_id" {
+  description = "Slack channel ID for HITL notifications"
+  type        = string
+  default     = "C000000000"
+}
+
+variable "enable_hitl" {
+  description = "Enable Human-in-the-Loop approval workflows"
+  type        = bool
+  default     = true
+}
