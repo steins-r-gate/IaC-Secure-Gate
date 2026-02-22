@@ -9,6 +9,7 @@ Called by Step Functions with a task token embedded in button values.
 import json
 import logging
 import os
+import time
 import urllib.request
 import urllib.error
 
@@ -20,12 +21,14 @@ ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 PROJECT_NAME = os.environ.get("PROJECT_NAME", "iac-secure-gate")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 SLACK_BOT_TOKEN_PARAM = os.environ.get("SLACK_BOT_TOKEN_PARAM", "")
+DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
 logger = logging.getLogger()
 logger.setLevel(LOG_LEVEL)
 
 ssm_client = boto3.client("ssm")
+dynamodb = boto3.resource("dynamodb")
 
 # Cache the bot token across invocations
 _bot_token_cache = None
@@ -168,8 +171,45 @@ def send_slack_message(blocks, text_fallback):
     return body
 
 
-def send_timeout_notification(control_id, resource_arn, severity):
-    """Send a notification that approval timed out and auto-remediation was triggered."""
+def update_slack_message(channel_id, message_ts, blocks, text_fallback):
+    """Update an existing Slack message in-place using chat.update."""
+    bot_token = get_bot_token()
+
+    payload = json.dumps({
+        "channel": channel_id,
+        "ts": message_ts,
+        "text": text_fallback,
+        "blocks": blocks,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://slack.com/api/chat.update",
+        data=payload,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {bot_token}",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+
+    if not body.get("ok"):
+        raise RuntimeError(f"Slack chat.update error: {body.get('error', 'unknown')}")
+
+    logger.info("Slack message updated: ts=%s, channel=%s", message_ts, channel_id)
+    return body
+
+
+def send_timeout_notification(control_id, resource_arn, severity, execution_id=None):
+    """
+    Notify Slack that approval timed out and auto-remediation was triggered.
+
+    When execution_id is provided, looks up the original approval message in
+    DynamoDB and replaces its buttons in-place with the timeout text. Falls back
+    to posting a new message if the record is not found.
+    """
     severity_emoji = {
         "CRITICAL": ":rotating_light:",
         "HIGH": ":warning:",
@@ -189,6 +229,23 @@ def send_timeout_notification(control_id, resource_arn, severity):
             "text": {"type": "mrkdwn", "text": text},
         }
     ]
+
+    # Try to update the original approval message in-place
+    if execution_id and DYNAMODB_TABLE:
+        try:
+            table = dynamodb.Table(DYNAMODB_TABLE)
+            item = table.get_item(
+                Key={"violation_type": "PENDING_APPROVAL", "timestamp": execution_id}
+            ).get("Item")
+            if item:
+                update_slack_message(item["channel_id"], item["message_ts"], blocks, text)
+                logger.info("Updated original approval message for execution %s", execution_id)
+                return
+            else:
+                logger.warning("No DynamoDB record for execution_id=%s; posting new message", execution_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to update original message: %s", exc)
+
     send_slack_message(blocks, text)
 
 
@@ -217,11 +274,13 @@ def lambda_handler(event, context):
             control_id=event.get("control_id", "Unknown"),
             resource_arn=event.get("resource_arn", "Unknown"),
             severity=event.get("severity", "UNKNOWN"),
+            execution_id=event.get("execution_id"),
         )
         return {"statusCode": 200, "body": {"message": "Timeout notification sent"}}
 
     task_token = event.get("task_token", "")
     finding_detail = event.get("finding", {})
+    execution_id = event.get("execution_id", "")
 
     if not task_token:
         raise ValueError("Missing task_token in event")
@@ -230,6 +289,21 @@ def lambda_handler(event, context):
     text_fallback = "Security finding requires approval — check the Slack message for details."
 
     result = send_slack_message(blocks, text_fallback)
+
+    # Persist channel + ts so the timeout handler can update this message in-place
+    if execution_id and DYNAMODB_TABLE:
+        try:
+            table = dynamodb.Table(DYNAMODB_TABLE)
+            table.put_item(Item={
+                "violation_type": "PENDING_APPROVAL",
+                "timestamp": execution_id,
+                "channel_id": result["channel"],
+                "message_ts": result["ts"],
+                "expiration_time": int(time.time()) + 86400,  # 24 h TTL
+            })
+            logger.info("Stored message ts for execution_id=%s", execution_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to store message ts in DynamoDB: %s", exc)
 
     return {
         "statusCode": 200,

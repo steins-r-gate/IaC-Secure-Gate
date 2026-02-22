@@ -250,8 +250,9 @@ resource "aws_sfn_state_machine" "hitl_orchestrator" {
         Parameters = {
           FunctionName = var.slack_notifier_lambda_arn
           Payload = {
-            "task_token.$" = "$$.Task.Token"
-            "finding.$"    = "$.detail"
+            "task_token.$"   = "$$.Task.Token"
+            "finding.$"      = "$.detail"
+            "execution_id.$" = "$$.Execution.Id"
           }
         }
         ResultPath     = "$.approval"
@@ -295,10 +296,11 @@ resource "aws_sfn_state_machine" "hitl_orchestrator" {
         Parameters = {
           FunctionName = var.slack_notifier_lambda_arn
           Payload = {
-            "message_type"  = "timeout_notification"
-            "control_id.$"  = "$.triage.control_id"
+            "message_type"   = "timeout_notification"
+            "control_id.$"   = "$.triage.control_id"
             "resource_arn.$" = "$.triage.resource_arn"
-            "severity.$"    = "$.triage.severity"
+            "severity.$"     = "$.triage.severity"
+            "execution_id.$" = "$$.Execution.Id"
           }
         }
         ResultPath = null

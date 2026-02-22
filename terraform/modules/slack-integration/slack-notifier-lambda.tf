@@ -103,6 +103,26 @@ resource "aws_iam_role_policy" "slack_notifier_ssm" {
   })
 }
 
+resource "aws_iam_role_policy" "slack_notifier_dynamodb" {
+  name = "${local.slack_notifier_name}-dynamodb-policy"
+  role = aws_iam_role.slack_notifier.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ApprovalMessageTracking"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem"
+        ]
+        Resource = var.dynamodb_table_arn
+      }
+    ]
+  })
+}
+
 # ----------------------------------------------------------------------
 # Lambda Function
 # ----------------------------------------------------------------------
@@ -126,6 +146,7 @@ resource "aws_lambda_function" "slack_notifier" {
       PROJECT_NAME          = var.project_name
       SLACK_CHANNEL_ID      = var.slack_channel_id
       SLACK_BOT_TOKEN_PARAM = aws_ssm_parameter.slack_bot_token.name
+      DYNAMODB_TABLE        = var.dynamodb_table_name
       LOG_LEVEL             = var.environment == "prod" ? "INFO" : "DEBUG"
     }
   }
