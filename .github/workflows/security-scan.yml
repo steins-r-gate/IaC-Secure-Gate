@@ -17,6 +17,7 @@ on:
       - 'terraform/**'
       - 'lambda/**'
       - 'policies/**'
+      - 'scripts/**'
   workflow_dispatch:
 
 permissions:
