@@ -186,18 +186,29 @@ def remediate_policy_document(policy_document: dict) -> tuple[dict, list[dict]]:
 
     for statement in statements:
         if is_overly_permissive_resource(statement):
-            removed_statements.append(statement)
-            logger.info(
-                "Removing dangerous statement",
-                extra={
-                    "sid": statement.get("Sid", "no-sid"),
-                    "actions": sanitize_for_logging(str(statement.get("Action", []))),
-                }
-            )
+            # Fix 2: Skip removal if a non-empty Condition block is present —
+            # conditions (e.g. aws:SourceVpc) can make wildcard statements safe.
+            if statement.get("Condition"):
+                logger.warning(
+                    "Skipping removal of wildcard statement with Condition block — manual review required",
+                    extra={
+                        "sid": statement.get("Sid", "no-sid"),
+                        "actions": sanitize_for_logging(str(statement.get("Action", []))),
+                    }
+                )
+                safe_statements.append(statement)
+            else:
+                removed_statements.append(statement)
+                logger.info(
+                    "Removing dangerous statement",
+                    extra={
+                        "sid": statement.get("Sid", "no-sid"),
+                        "actions": sanitize_for_logging(str(statement.get("Action", []))),
+                    }
+                )
         else:
             safe_statements.append(statement)
 
-    # Create remediated policy
     remediated_policy = {
         "Version": policy_document.get("Version", "2012-10-17"),
         "Statement": safe_statements if safe_statements else [
@@ -207,7 +218,7 @@ def remediate_policy_document(policy_document: dict) -> tuple[dict, list[dict]]:
                 "Action": "none:null",
                 "Resource": "*"
             }
-        ]
+        ],
     }
 
     return remediated_policy, removed_statements

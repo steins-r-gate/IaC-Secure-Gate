@@ -48,7 +48,8 @@ deny[msg] {
 }
 
 # ──────────────────────────────────────────────────────────────────
-# DENY: IAM role assume_role_policy with wildcard principals
+# DENY: IAM role assume_role_policy with wildcard principals (string form)
+# Catches: "Principal": "*"
 # ──────────────────────────────────────────────────────────────────
 deny[msg] {
 	resource := input.resource_changes[_]
@@ -66,6 +67,31 @@ deny[msg] {
 
 	msg := sprintf(
 		"CRITICAL: IAM role '%s' allows assumption by wildcard principal '*'. This permits any AWS account to assume this role. [Security Hub: IAM.1]",
+		[resource.name],
+	)
+}
+
+# ──────────────────────────────────────────────────────────────────
+# DENY: IAM role assume_role_policy with wildcard principals (object form)
+# Catches: "Principal": {"AWS": "*"} or {"Service": "*"} or {"Federated": "*"}
+# The string form check above misses this equally dangerous variant.
+# ──────────────────────────────────────────────────────────────────
+deny[msg] {
+	resource := input.resource_changes[_]
+	resource.type == "aws_iam_role"
+	resource.change.after.assume_role_policy != null
+
+	policy := json.unmarshal(resource.change.after.assume_role_policy)
+	statement := policy.Statement[_]
+
+	statement.Effect == "Allow"
+
+	is_object(statement.Principal)
+	principal_values := {v | v := statement.Principal[_]}
+	"*" in principal_values
+
+	msg := sprintf(
+		"CRITICAL: IAM role '%s' allows assumption by wildcard principal in object form (e.g. {\"AWS\": \"*\"}). This permits any entity to assume this role. [Security Hub: IAM.1]",
 		[resource.name],
 	)
 }

@@ -16,6 +16,7 @@ import time
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 # ── Configuration ────────────────────────────────────────────────────
 
@@ -83,7 +84,6 @@ def check_false_positive_registry(resource_arn, control_id):
                 ":cid": control_id,
                 ":now": now_epoch,
             },
-            Limit=1,
         )
         items = response.get("Items", [])
         if items:
@@ -92,8 +92,12 @@ def check_false_positive_registry(resource_arn, control_id):
                 resource_arn, control_id,
             )
             return True
-    except Exception as e:
-        logger.warning("False positive registry check failed: %s", e)
+    except ClientError as e:
+        # Fix 8: Only catch DynamoDB ClientErrors here. Programming errors
+        # (AttributeError, TypeError, etc.) must propagate so they surface in
+        # CloudWatch — a broken registry silently returning False would cause
+        # all findings to auto-remediate, which is the wrong failure mode.
+        logger.warning("False positive registry check failed (DynamoDB error): %s", e)
 
     return False
 

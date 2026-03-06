@@ -25,7 +25,6 @@ taggable_resources := {
 	"aws_sqs_queue",
 	"aws_kms_key",
 	"aws_cloudwatch_log_group",
-	"aws_iam_role",
 	"aws_security_group",
 }
 
@@ -59,10 +58,10 @@ deny[msg] {
 
 	tags := object.get(resource.change.after, "tags", {})
 	tags.ManagedBy
-	tags.ManagedBy != "terraform"
+	lower(tags.ManagedBy) != "terraform"
 
 	msg := sprintf(
-		"CRITICAL: Resource '%s' has ManagedBy='%s' — must be 'terraform'. This ensures infrastructure is managed through IaC only.",
+		"CRITICAL: Resource '%s' has ManagedBy='%s' — must be 'terraform' (case-insensitive). This ensures infrastructure is managed through IaC only.",
 		[resource.name, tags.ManagedBy],
 	)
 }

@@ -152,7 +152,13 @@ def is_protected_bucket(bucket_name: str) -> bool:
         if e.response["Error"]["Code"] == "NoSuchTagSet":
             pass  # No tags, not protected
         else:
-            logger.warning(f"Could not check bucket tags", extra={"error": str(e)})
+            # Fix 3: Fail-closed on unexpected errors — treat as protected to block
+            # remediation until the error is investigated (permissions issue, network, etc.).
+            logger.warning(
+                "Unexpected error checking bucket tags — treating bucket as protected to fail safely",
+                extra={"bucket": bucket_name, "error": str(e)},
+            )
+            return True
 
     return False
 
