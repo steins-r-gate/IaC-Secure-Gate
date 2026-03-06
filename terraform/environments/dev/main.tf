@@ -455,3 +455,4 @@ module "cis_alarms" {
 
   depends_on = [module.cloudtrail]
 }
+# pr-gate verification 2026-03-06

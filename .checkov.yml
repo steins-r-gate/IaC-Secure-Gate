@@ -108,3 +108,45 @@ skip-check:
   # CloudTrail: Checkov cannot evaluate count-gated CloudWatch Logs integration statically
   # CloudWatch Logs IS enabled via enable_cloudwatch_logs = true in dev/main.tf
   - CKV2_AWS_10
+
+  # API Gateway (Slack integration): authorization = "NONE" is required for Slack webhook delivery
+  # Slack POSTs to the endpoint cannot carry IAM/Cognito credentials; auth is enforced
+  # in Lambda via HMAC-SHA256 signature verification against the Slack signing secret
+  - CKV_AWS_59
+
+  # API Gateway (Slack integration): access logging requires a dedicated CloudWatch Log Group
+  # and incurs additional cost; CloudTrail covers API-level audit for this low-volume webhook
+  - CKV_AWS_76
+  - CKV2_AWS_4
+
+  # API Gateway (Slack integration): response caching (~$14/month) is unnecessary for a
+  # low-volume Slack webhook — each callback is a unique event requiring individual processing
+  - CKV_AWS_120
+  - CKV_AWS_225
+
+  # API Gateway (Slack integration): X-Ray tracing adds per-request cost; CloudWatch Logs
+  # provide sufficient observability for this webhook (consistent with Lambda X-Ray skip CKV_AWS_50)
+  - CKV_AWS_73
+
+  # API Gateway (Slack integration): request validation at API GW level is not applicable —
+  # Slack payload format varies by interaction type; validation runs in Lambda after
+  # HMAC-SHA256 signature verification
+  - CKV2_AWS_53
+
+  # API Gateway (Slack integration): Slack webhook delivery does not support mutual TLS (mTLS)
+  # Client certificates cannot be provisioned for Slack's outbound HTTPS calls
+  - CKV2_AWS_51
+
+  # API Gateway (Slack integration): WAF (~$5/month base + per-request) exceeds budget for dev;
+  # equivalent protection provided by Slack IP allowlisting + HMAC-SHA256 signature verification
+  - CKV2_AWS_29
+
+  # SSM Parameter Store (Slack integration): uses AWS managed key (aws/ssm) — parameters
+  # ARE encrypted at rest; customer-managed CMK adds ~$1/month per key with no security benefit
+  # for bot token/signing secret stored in a single-account, tightly-scoped parameter path
+  - CKV_AWS_337
+
+  # Step Functions (HITL): X-Ray tracing not enabled — state machine has CloudWatch execution
+  # logging at ALL level with include_execution_data = true, providing full observability;
+  # consistent with Lambda X-Ray skip (CKV_AWS_50)
+  - CKV_AWS_284

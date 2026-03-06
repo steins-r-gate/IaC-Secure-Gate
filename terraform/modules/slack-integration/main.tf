@@ -16,6 +16,10 @@ resource "aws_api_gateway_rest_api" "slack_callback" {
     types = ["REGIONAL"]
   }
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   tags = merge(local.module_tags, {
     Name = "${local.name_prefix}-slack-callback-api"
   })
