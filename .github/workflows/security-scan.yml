@@ -207,8 +207,8 @@ jobs:
           CONFTEST_VERSION="0.46.0"
           TARBALL="conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
           wget -q "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/${TARBALL}"
-          wget -q "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/${TARBALL}.sha256sum"
-          sha256sum -c "${TARBALL}.sha256sum"
+          wget -q "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/checksums.txt"
+          grep "${TARBALL}" checksums.txt | sha256sum -c -
           tar xzf "${TARBALL}"
           sudo mv conftest /usr/local/bin/
           conftest --version
