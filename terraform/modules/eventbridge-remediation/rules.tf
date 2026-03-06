@@ -20,6 +20,7 @@ resource "aws_cloudwatch_event_rule" "iam_wildcard" {
   event_pattern = jsonencode({
     source      = ["aws.securityhub"]
     detail-type = ["Security Hub Findings - Imported"]
+    account     = [data.aws_caller_identity.current.account_id]
     detail = {
       findings = {
         # Match FAILED compliance status
@@ -98,6 +99,7 @@ resource "aws_cloudwatch_event_rule" "s3_public" {
   event_pattern = jsonencode({
     source      = ["aws.securityhub"]
     detail-type = ["Security Hub Findings - Imported"]
+    account     = [data.aws_caller_identity.current.account_id]
     detail = {
       findings = {
         Compliance = {
@@ -173,6 +175,7 @@ resource "aws_cloudwatch_event_rule" "sg_open" {
   event_pattern = jsonencode({
     source      = ["aws.securityhub"]
     detail-type = ["Security Hub Findings - Imported"]
+    account     = [data.aws_caller_identity.current.account_id]
     detail = {
       findings = {
         Compliance = {

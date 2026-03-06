@@ -37,10 +37,17 @@ def get_bot_token():
     """Retrieve Slack bot token from SSM Parameter Store (cached)."""
     global _bot_token_cache
     if _bot_token_cache is None:
-        response = ssm_client.get_parameter(
-            Name=SLACK_BOT_TOKEN_PARAM,
-            WithDecryption=True,
-        )
+        # Fix 6: Wrap SSM call so operators get a clear error message instead
+        # of a raw botocore exception when the parameter is missing/misconfigured.
+        try:
+            response = ssm_client.get_parameter(
+                Name=SLACK_BOT_TOKEN_PARAM,
+                WithDecryption=True,
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to retrieve Slack bot token from SSM parameter '{SLACK_BOT_TOKEN_PARAM}': {e}"
+            ) from e
         _bot_token_cache = response["Parameter"]["Value"]
     return _bot_token_cache
 
@@ -161,7 +168,7 @@ def send_slack_message(approval_id, pr_number, pr_url, violations, timestamp):
         method="POST",
     )
 
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         body = json.loads(resp.read().decode("utf-8"))
 
     if not body.get("ok"):

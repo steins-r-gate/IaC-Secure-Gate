@@ -123,7 +123,7 @@ def update_original_message(channel_id, message_ts, action, user_info):
         },
         method="POST",
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         body = json.loads(resp.read().decode("utf-8"))
 
     if not body.get("ok"):
@@ -226,7 +226,14 @@ def lambda_handler(event, context):
     if not payload_str:
         return {"statusCode": 400, "body": json.dumps({"error": "Missing payload"})}
 
-    payload = json.loads(payload_str)
+    # Fix 4: Guard against malformed payloads — a JSONDecodeError here would
+    # return 500, causing Slack to retry and potentially flood the endpoint.
+    try:
+        payload = json.loads(payload_str)
+    except json.JSONDecodeError as e:
+        logger.warning("Failed to parse Slack payload JSON: %s", e)
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid payload JSON"})}
+
     user_info = payload.get("user", {})
     channel_id = payload.get("channel", {}).get("id", "")
     message_ts = payload.get("message", {}).get("ts", "")
@@ -235,7 +242,11 @@ def lambda_handler(event, context):
     if not actions:
         return {"statusCode": 400, "body": json.dumps({"error": "No actions in payload"})}
 
-    action_value = json.loads(actions[0].get("value", "{}"))
+    try:
+        action_value = json.loads(actions[0].get("value", "{}"))
+    except json.JSONDecodeError as e:
+        logger.warning("Failed to parse action value JSON: %s", e)
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid action value JSON"})}
     callback_type = action_value.get("type", "")
 
     try:

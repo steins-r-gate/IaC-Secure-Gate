@@ -161,7 +161,7 @@ def send_slack_message(blocks, text_fallback):
         method="POST",
     )
 
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         body = json.loads(resp.read().decode("utf-8"))
 
     if not body.get("ok"):
@@ -192,7 +192,7 @@ def update_slack_message(channel_id, message_ts, blocks, text_fallback):
         method="POST",
     )
 
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         body = json.loads(resp.read().decode("utf-8"))
 
     if not body.get("ok"):

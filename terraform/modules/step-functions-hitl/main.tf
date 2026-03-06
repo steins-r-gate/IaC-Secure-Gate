@@ -88,6 +88,19 @@ resource "aws_iam_role_policy" "sfn_logging" {
 }
 
 # ----------------------------------------------------------------------
+# CloudWatch Log Group for State Machine execution logs
+# ----------------------------------------------------------------------
+
+resource "aws_cloudwatch_log_group" "sfn_logs" {
+  name              = "/aws/states/${local.state_machine_name}"
+  retention_in_days = 90
+
+  tags = merge(local.module_tags, {
+    Name = "/aws/states/${local.state_machine_name}"
+  })
+}
+
+# ----------------------------------------------------------------------
 # State Machine Definition
 # ----------------------------------------------------------------------
 
@@ -350,6 +363,12 @@ resource "aws_sfn_state_machine" "hitl_orchestrator" {
       }
     }
   })
+
+  logging_configuration {
+    log_destination        = "${aws_cloudwatch_log_group.sfn_logs.arn}:*"
+    include_execution_data = true
+    level                  = "ALL"
+  }
 
   tags = merge(local.module_tags, {
     Name = local.state_machine_name
