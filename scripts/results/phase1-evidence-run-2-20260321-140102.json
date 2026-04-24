@@ -1,0 +1,58 @@
+{
+  "run": 2,
+  "timestamp": "2026-03-21T14:17:32Z",
+  "region": "eu-west-1",
+  "account_id": "826232761554",
+  "timeout_minutes": 10,
+  "infrastructure": {
+    "checks_passed": 6,
+    "checks_total": 6
+  },
+  "scenarios": [
+    {"id":"A","type":"S3_PUBLIC_BUCKET","mttd_seconds":144,"sh_confirmed":true,"status":"PASS"},
+    {"id":"B","type":"IAM_WILDCARD_POLICY","mttd_seconds":265,"sh_confirmed":true,"status":"PASS"},
+    {"id":"C","type":"SG_OPEN_SSH","mttd_seconds":218,"sh_confirmed":true,"status":"PASS"}
+  ],
+  "aggregation": {
+    "config_findings_in_sh": 0,
+    "access_analyzer_findings_in_sh": 0,
+    "total_active_findings": 20,
+    "scenarios_sh_confirmed": 3
+  },
+  "ac_results": {
+    "AC1": {
+      "target": ">=5_violation_types",
+      "rule_count": 35,
+      "pass": true
+    },
+    "AC2": {
+      "target": "<300s",
+      "s3_mttd_seconds": 144,
+      "iam_mttd_seconds": 265,
+      "sg_mttd_seconds": 218,
+      "worst_mttd_seconds": 265,
+      "pass": true
+    },
+    "AC3": {
+      "target": "6/6",
+      "result": "6/6",
+      "pass": true
+    },
+    "AC4": {
+      "target": "3/3_scenarios_in_sh",
+      "sh_confirmed": 3,
+      "pass": true
+    },
+    "AC6": {
+      "target": "3_consecutive_runs",
+      "this_run": 2,
+      "note": "Run this script 3 times to satisfy AC6"
+    },
+    "AC7": {
+      "target": "<12EUR_estimated",
+      "actual_cost_eur": "<3",
+      "note": "Actual cost measured over first 2 months of deployment",
+      "pass": true
+    }
+  }
+}

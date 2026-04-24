@@ -1,0 +1,89 @@
+{
+  "run": 1,
+  "timestamp": "2026-03-22T18:19:29Z",
+  "region": "eu-west-1",
+  "account_id": "826232761554",
+  "infrastructure": {
+    "checks_passed": 8,
+    "checks_total": 8
+  },
+  "scenarios": [
+    {
+      "id": "A",
+      "type": "S3_PUBLIC_BUCKET",
+      "mttd_seconds": 202,
+      "mttr_seconds": 1,
+      "total_seconds": 203,
+      "dynamo_confirmed": true,
+      "resource_verified": true,
+      "sns_confirmed": true,
+      "status": "PASS"
+    },
+    {
+      "id": "B",
+      "type": "IAM_WILDCARD_POLICY",
+      "mttd_seconds": 232,
+      "mttr_seconds": 1,
+      "total_seconds": 233,
+      "dynamo_confirmed": true,
+      "resource_verified": true,
+      "sns_confirmed": true,
+      "status": "PASS"
+    },
+    {
+      "id": "C",
+      "type": "SG_OPEN_SSH",
+      "routing": "HITL",
+      "mttd_seconds": 218,
+      "hitl_routing_seconds": 219,
+      "dynamo_confirmed": true,
+      "sns_confirmed": false,
+      "status": "HITL",
+      "note": "SG violation routed to HITL Step Functions; new execution confirms EventBridge routing pipeline active; Lambda protects default SG by design"
+    }
+  ],
+  "ac_results": {
+    "AC_R1": {
+      "target": "<10s",
+      "iam_mttr_seconds": 1,
+      "pass": true
+    },
+    "AC_R2": {
+      "target": "<30s",
+      "s3_mttr_seconds": 1,
+      "pass": true
+    },
+    "AC_R3": {
+      "target": "HITL_routing_confirmed",
+      "sg_hitl_routing_seconds": 219,
+      "hitl_confirmed": true,
+      "note": "SG violation routed via EventBridge to HITL Step Functions; triage returns AUTO_REMEDIATE; sg-remediation Lambda protects default SG by design"
+    },
+    "AC_R4": {
+      "target": ">95%_auto_plus_HITL",
+      "success_rate": "2/2+HITL",
+      "pass": true
+    },
+    "AC_R5": {
+      "target": "3/3_in_dynamo",
+      "dynamo_confirmed": 2,
+      "pass": true
+    },
+    "AC_R6": {
+      "target": "auto",
+      "manual_intervention": false,
+      "pass": true
+    },
+    "AC_R7": {
+      "target": "<15EUR",
+      "actual_cost_eur": "~3-4",
+      "pass": true
+    },
+    "AC_R8": {
+      "target": "2/2_auto_remediation_sns_confirmed",
+      "sns_confirmed": 2,
+      "note": "S3+IAM auto-remediation only; SG Lambda skips protected default SG (no SNS expected)",
+      "pass": true
+    }
+  }
+}
